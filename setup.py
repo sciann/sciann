@@ -28,7 +28,7 @@ setup(
                       'pyyaml',
                       'h5py',
                       'sklearn',
-                      'tensorflow==2.3.0',
+                      'tensorflow==2.3.1',
                       ],
     extras_require={
           'visualize': ['pydot>=1.2.4'],
