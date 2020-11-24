@@ -11,6 +11,7 @@ graph_unique_name = K.get_graph().unique_name
 from tensorflow.python.keras.layers import Dense
 from tensorflow.python.keras.layers import Activation
 from tensorflow.python.keras.layers import Concatenate
+from tensorflow.python.keras.layers import Lambda
 from tensorflow.python.keras.models import Model
 
 from ..utils import to_list, unpack_singleton, is_same_tensor, unique_tensors
@@ -43,6 +44,8 @@ class Functional(object):
             Last layer will have a linear output.
         output_activation: defaulted to "linear".
             Activation function to be applied to the network output.
+        res_net: (True, False). Constructs a resnet architecture.
+            Defaulted to False.
         kernel_initializer: Initializer of the `Kernel`, from `k.initializers`.
         bias_initializer: Initializer of the `Bias`, from `k.initializers`.
         kernel_regularizer: Regularizer for the kernel.
@@ -66,6 +69,7 @@ class Functional(object):
                  hidden_layers=None,
                  activation="tanh",
                  output_activation="linear",
+                 res_net=False,
                  kernel_initializer=None,
                  bias_initializer=None,
                  kernel_regularizer=None,
@@ -166,6 +170,31 @@ class Functional(object):
 
         # Define the output network.
         net = [net_input]
+
+        # define the ResNet networks.
+        if res_net is True:
+            res_layers = []
+            res_outputs = []
+            for rl in ["U", "V", "H"]:
+                layers.append(
+                    Dense(
+                        hidden_layers[0],
+                        kernel_initializer=kernel_initializer[0],
+                        bias_initializer=bias_initializer[0],
+                        kernel_regularizer=kernel_regularizer,
+                        bias_regularizer=bias_regularizer,
+                        trainable=trainable,
+                        dtype=dtype,
+                        name=graph_unique_name("DRes"+rl+"{:d}b".format(hidden_layers[0]))
+                    )
+                )
+                res_output = layers[-1](net_input)
+                # Apply the activation.
+                if activations[0].activation.__name__ != 'linear':
+                    layers.append(activations[0])
+                    res_outputs.append(layers[-1](res_output))
+            net[-1] = res_outputs[-1]
+
         for nLay, nNeuron in enumerate(hidden_layers):
             # Add the layer.
             layer = Dense(
@@ -185,6 +214,10 @@ class Functional(object):
                 layer = activations[nLay]
                 layers.append(layer)
                 net[-1] = layer(net[-1])
+            # Add the resnet layer
+            if res_net is True:
+                layer = Lambda(lambda xs: (1-xs[0])*xs[1] + xs[0]*xs[2], name=graph_unique_name("ResLayer"))
+                net[-1] = layer([net[-1]] + res_outputs[:2])
 
         # store output layers.
         for out in output_fields:

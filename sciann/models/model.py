@@ -19,6 +19,7 @@ from tensorflow import gradients as tf_gradients
 from ..utils import unpack_singleton, to_list
 from ..utils import is_variable, is_constraint, is_functional
 from ..utils.optimizers import GradientObserver, ScipyOptimizer
+from ..utils.callbacks import *
 
 from ..functionals import Variable
 from ..functionals import RadialBasis
@@ -217,6 +218,8 @@ class SciModel(object):
               epochs=100,
               learning_rate=0.001,
               adaptive_weights=False,
+              log_adaptive_weights=None,
+              log_loss_gradients=None,
               shuffle=True,
               callbacks=None,
               stop_lr_value=1e-8,
@@ -224,6 +227,8 @@ class SciModel(object):
               reduce_lr_min_delta=0.,
               stop_after=None,
               stop_loss_value=1e-8,
+              log_parameters=None,
+              log_parameters_freq=None,
               save_weights_to=None,
               save_weights_freq=0,
               default_zero_weight=0.0,
@@ -259,6 +264,10 @@ class SciModel(object):
                 Default value is True.
             adaptive_weights: Defaulted to False (no updates - evaluated once in the beginning).
                 Used if the model is compiled with adaptive_weights.
+            log_adaptive_weights: Logging the weights and gradients of adaptive_weight.
+                Defaulted to adaptive_weights.
+            log_loss_gradients: Frequency for logging the norm2 of gradients of each target.
+                Defaulted to None.
             callbacks: List of `keras.callbacks.Callback` instances.
             reduce_lr_after: patience to reduce learning rate or stop after certain missed epochs.
                 Defaulted to epochs max(10, epochs/10).
@@ -410,10 +419,25 @@ class SciModel(object):
             callbacks.append(
                 GradientPathologyLossWeight(
                     self.model, x_true, y_star, sample_weights,
-                    beta=0.8, freq=adaptive_weights,
+                    beta=0.1, freq=adaptive_weights, log_freq=log_adaptive_weights,
                     types=[type(v).__name__ for v in self.constraints]
                 ),
                 # k.callbacks.CSVLogger('GP.log')
+            )
+        elif log_loss_gradients:
+            callbacks.append(
+                LossGradientHistory(
+                    self.model, x_true, y_star, sample_weights,
+                    freq=log_loss_gradients
+                )
+            )
+
+        if log_parameters:
+            callbacks.append(
+                ParameterHistory(
+                    list(log_parameters),
+                    freq=1 if log_parameters_freq is None else log_parameters_freq
+                )
             )
 
         # training the models.
@@ -625,131 +649,4 @@ class SciModel(object):
                 ys[-1][adjusted_ids, :] = 0.0
 
         return ys, weis
-
-
-class EarlyStoppingByLossVal(k.callbacks.Callback):
-    def __init__(self, value, stop_after=1):
-        super(k.callbacks.Callback, self).__init__()
-        self.value = value
-        self.wait = stop_after
-        
-    def on_epoch_end(self, epoch, logs={}):
-        current = logs.get('loss')
-        if current < self.value:
-            self.wait -= 1
-            if self.wait <= 0:
-                self.model.stop_training = True
-                print("Epoch {:05d}: early stopping at loss value {:0.6e}".format(epoch, current))
-                print("Revise 'stop_loss_value={:0.12f}' in '.train' if it was not your intent. ".format(self.value))
-
-
-class EarlyStoppingByLearningRate(k.callbacks.Callback):
-    def __init__(self, value):
-        super(k.callbacks.Callback, self).__init__()
-        self.value = value
-
-    def on_epoch_end(self, epoch, logs={}):
-        current = logs.get('lr')
-        if current < self.value:
-            self.model.stop_training = True
-            print("Epoch {:05d}: early stopping at learning rate {:0.6e}".format(epoch, current))
-            print("Revise 'stop_lr_value={:0.12f}' in '.train' if it was not your intent. ".format(self.value))
-
-
-class GradientPathologyLossWeight(k.callbacks.Callback):
-    def __init__(self, model, inputs, targets, weights, beta=0.8, freq=100, types=None):
-        super(k.callbacks.Callback, self).__init__()
-        self.inputs = inputs
-        self.targets = targets
-        self.weights = weights
-        self.loss_grads = []
-        for i in range(len(model.outputs)):
-            yp = model.outputs[i]
-            ys = targets[i]
-            ws = weights[i]
-            f = tf.reduce_mean(
-                model.loss_functions[i](ys, yp, sample_weight=ws)
-            )
-            gf = tf_gradients(f, model.trainable_weights, unconnected_gradients='zero')
-            self.loss_grads.append(
-                K.function(model.inputs, gf)
-            )
-        self.freq = 0 if isinstance(freq, bool) else freq
-        self.beta = beta
-        if types is None:
-            self.types = ['PDE'] + (len(self.targets)-1)*['Data']
-        else:
-            assert len(targets) == len(types)
-            assert 'PDE' in types, \
-                "Adaptive weights can only be used when PDE constraint is defined."
-            self.types = types
-
-    def on_train_begin(self, logs={}):
-        # update loss-weights
-        self.update_loss_weights(0)
-
-    def on_epoch_end(self, epoch, logs={}):
-        loss_gradients = self.eval_loss_gradients()
-        if epoch > 1 and self.freq > 1 \
-                and epoch % self.freq == 0:
-            self.update_loss_weights(epoch, loss_gradients)
-        # log the weights in the history output.
-        logs['adaptive_weights'] = [
-            K.get_value(wi) for wi in self.model.loss_weights
-        ]
-        # log norm2 of gradients
-        logs['loss_gradients'] = [
-            np.linalg.norm(lgi) for lgi in loss_gradients
-        ]
-
-    def eval_loss_gradients(self):
-        # eval new gradients
-        updated_grads = []
-        for lgi, trg in zip(self.loss_grads, self.targets):
-            updated_grads.append(
-                np.concatenate(
-                    [np.abs(wg).flatten() for wg in lgi(self.inputs)]
-                )
-            )
-        return updated_grads
-
-    def eval_loss_weights(self, updated_grads=None):
-        # Method 1: normalization by PDE.
-        # eval new gradients
-        if updated_grads is None:
-            updated_grads = self.eval_loss_gradients()
-        # eval max normalization on PDE.
-        ref_grad = []
-        for type, ws in zip(self.types, updated_grads):
-            if type is 'PDE':
-                ref_grad.append(ws.max())
-        ref_grad = max(ref_grad)
-        # mean loss terms
-        mean_grad = []
-        for type, ws in zip(self.types, updated_grads):
-            # if type is not 'PDE':
-            ws_mean = ws.mean()
-            mean_grad += [1.0 if ws_mean == 0. else ws_mean]
-        # mean_grad = np.mean(mean_grad)
-        # evaluate new weights
-        new_weights = []
-        for i, type in enumerate(self.types):
-            if type == 'PDE':
-                new_weights.append(1.0)
-            elif type in ('Data', 'Tie'):
-                new_weights.append(ref_grad / mean_grad[i])
-            else:
-                assert 'Incorrect target. '
-        return new_weights
-
-    def update_loss_weights(self, epoch, updated_grads=None):
-        new_weights = self.eval_loss_weights(updated_grads)
-        # evaluate new weights
-        for i, wi in enumerate(self.model.loss_weights):
-            gp_weight = new_weights[i] / K.get_value(wi)
-            new_val = (1.0-self.beta)*K.get_value(wi) + self.beta*gp_weight
-            K.set_value(self.model.loss_weights[i], new_val)
-        # print updates
-        print('\n+ adaptive_weights at epoch {}:'.format(epoch),
-              [K.get_value(wi) for wi in self.model.loss_weights])
 

@@ -86,6 +86,14 @@ class Parameter(Functional):
     def get_class(cls):
         return Functional
 
+    @property
+    def name(self):
+        return self.layers[-1].name
+
+    @property
+    def value(self):
+        return K.get_value(self.layers[-1].param)
+
 
 @keras_export('keras.layers.ParameterBase')
 class ParameterBase(k.layers.Layer):

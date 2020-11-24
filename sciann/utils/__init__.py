@@ -10,8 +10,10 @@ from . import validations
 from . import activations
 from . import initializers
 from . import optimizers
+from . import callbacks
 
 from .utilities import *
 from .validations import *
 from .math import *
 from .find_neighbors import *
+from .callbacks import *
