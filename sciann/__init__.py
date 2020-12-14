@@ -22,6 +22,7 @@ from .constraints import Constraint, PDE, Data, Tie
 from .utils.math import *
 from .utils import math
 from .utils.utilities import reset_session, clear_session
+from .utils.utilities import set_default_log_path, get_default_log_path
 from .utils.utilities import set_random_seed
 from .utils.utilities import set_floatx
 
@@ -32,7 +33,7 @@ __copyright__ = "Copyright 2019, Physics-Informed Deep Learning"
 __credits__ = []
 __url__ = "http://github.com/sciann/sciann]"
 __license__ = "MIT"
-__version__ = "0.5.4.0"
+__version__ = "0.5.5.0"
 __cite__ = \
     '@misc{haghighat2019sciann, \n' +\
     '    title={SciANN: A Keras/Tensorflow wrapper for scientific computations and physics-informed deep learning using artificial neural networks}, \n' +\
@@ -63,3 +64,6 @@ if 'SCIANN_WELCOME_MSG' in os.environ.keys() and \
     pass
 else:
     print(__welcome__)
+
+# set default logging directory.
+set_default_log_path(os.path.join(os.getcwd(), "logs"))

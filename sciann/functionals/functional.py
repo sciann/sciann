@@ -336,6 +336,10 @@ class Functional(object):
     def model(self):
         self._set_model()
         return self._model
+
+    @property
+    def name(self):
+        return self._layers[-1].name
     
     def _set_model(self):
         if hasattr(self, '_model'):
@@ -517,6 +521,24 @@ class Functional(object):
 
     def diff(self, *args, **kwargs):
         return math.diff(self, *args, **kwargs)
+
+    def __eq__(self, other):
+        return math.equal(self, other)
+
+    def __ne__(self, other):
+        return math.not_equal(self, other)
+
+    def __gt__(self, other):
+        return math.greater(self, other)
+
+    def __ge__(self, other):
+        return math.greater_equal(self, other)
+
+    def __lt__(self, other):
+        return math.less(self, other)
+
+    def __le__(self, other):
+        return math.less_equal(self, other)
 
     @classmethod
     def get_class(cls):

@@ -5,6 +5,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import os
 import numpy as np
 from numpy import pi
 
@@ -28,6 +29,7 @@ from .initializers import SciKernelInitializer as KInitializer
 from .initializers import SciBiasInitializer as BInitializer
 from .activations import get_activation, SciActivation, SciActivationLayer
 
+_DEFAULT_LOG_PATH = ""
 
 def _is_tf_1():
     return tf.__version__.startswith('1.')
@@ -57,6 +59,26 @@ def reset_session():
 
 
 clear_session = reset_session
+
+
+def set_default_log_path(path):
+    global _DEFAULT_LOG_PATH
+    _DEFAULT_LOG_PATH = path
+
+
+def get_default_log_path():
+    return _DEFAULT_LOG_PATH
+
+
+def get_log_path(path=None, prefix=None):
+    file_path = _DEFAULT_LOG_PATH if path is None else path
+    if not os.path.isdir(file_path):
+        os.makedirs(file_path)
+    # add the prefix.
+    if prefix is None:
+        return file_path
+    else:
+        return os.path.join(file_path, prefix)
 
 
 def is_same_tensor(x, y):

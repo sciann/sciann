@@ -217,8 +217,7 @@ class SciModel(object):
               batch_size=2**6,
               epochs=100,
               learning_rate=0.001,
-              adaptive_weights=False,
-              log_adaptive_weights=None,
+              adaptive_weights=None,
               log_loss_gradients=None,
               shuffle=True,
               callbacks=None,
@@ -228,7 +227,8 @@ class SciModel(object):
               stop_after=None,
               stop_loss_value=1e-8,
               log_parameters=None,
-              log_parameters_freq=None,
+              log_functionals=None,
+              log_loss_landscape=None,
               save_weights_to=None,
               save_weights_freq=0,
               default_zero_weight=0.0,
@@ -262,12 +262,13 @@ class SciModel(object):
                     learning_rate = ([0, 100, 1000], [0.001, 0.0005, 0.00001])
             shuffle: Boolean (whether to shuffle the training data).
                 Default value is True.
-            adaptive_weights: Defaulted to False (no updates - evaluated once in the beginning).
-                Used if the model is compiled with adaptive_weights.
-            log_adaptive_weights: Logging the weights and gradients of adaptive_weight.
-                Defaulted to adaptive_weights.
-            log_loss_gradients: Frequency for logging the norm2 of gradients of each target.
-                Defaulted to None.
+            adaptive_weights: Pass a Dict with the following keys:
+                . freq: Freq to update the weights.
+                . log_freq: Freq to log the weights and gradients in the history object.
+                . beta: The beta parameter in from Gradient Pathology paper.
+            log_loss_gradients: Pass a Dict with the following keys:
+                . freq: Freq of logs. Defaulted to 100.
+                . path: Path to log the gradients.
             callbacks: List of `keras.callbacks.Callback` instances.
             reduce_lr_after: patience to reduce learning rate or stop after certain missed epochs.
                 Defaulted to epochs max(10, epochs/10).
@@ -278,7 +279,21 @@ class SciModel(object):
                 This values affects number of failed attempts to trigger reduce learning rate based on reduce_lr_after. 
             stop_after: To stop after certain missed epochs. Defaulted to total number of epochs.
             stop_loss_value: The minimum value of the total loss that stops the training automatically. 
-                Defaulted to 1e-8. 
+                Defaulted to 1e-8.
+            log_parameters: Dict object expecting the following keys:
+                . parameters: pass list of parameters.
+                . freq: pass freq of outputs.
+            log_functionals: Dict object expecting the following keys:
+                . functionals: List of functionals to log their training history.
+                . inputs: The input grid to evaluate the value of each functional.
+                          Should be of the same size as the inputs to the model.train.
+                . path: Path to the location that the csv files will be logged.
+                . freq: Freq of logging the functionals.
+            log_loss_landscape: Dict object expecting the following arguments:
+                . norm: defaulted to 2.
+                . resolution: defaulted to 10.
+                . path: Path to the location that the csv files will be logged.
+                . freq: Freq of logging the loss landscape.
             save_weights_to: (file_path) If you want to save the state of the model (at the end of the training).
             save_weights_freq: (Integer) Save weights every N epcohs.
                 Defaulted to 0.
@@ -416,30 +431,46 @@ class SciModel(object):
             opt_fit_func = self._model.fit
 
         if adaptive_weights:
+            if not isinstance(adaptive_weights, dict):
+                adaptive_weights = GradientPathologyLossWeight.prepare_inputs(adaptive_weights)
             callbacks.append(
                 GradientPathologyLossWeight(
-                    self.model, x_true, y_star, sample_weights,
-                    beta=0.1, freq=adaptive_weights, log_freq=log_adaptive_weights,
-                    types=[type(v).__name__ for v in self.constraints]
+                    self.model, x_true, y_star, sample_weights, 
+                    types=[type(v).__name__ for v in self.constraints],
+                    **adaptive_weights
                 ),
-                # k.callbacks.CSVLogger('GP.log')
             )
-        elif log_loss_gradients:
+
+        if log_loss_gradients:
+            if not isinstance(log_loss_gradients, dict):
+                log_loss_gradients = LossGradientHistory.prepare_inputs(log_loss_gradients)
             callbacks.append(
                 LossGradientHistory(
                     self.model, x_true, y_star, sample_weights,
-                    freq=log_loss_gradients
+                    **log_loss_gradients
                 )
             )
-
         if log_parameters:
+            if not isinstance(log_parameters, dict):
+                log_parameters = ParameterHistory.prepare_inputs(log_parameters)
             callbacks.append(
-                ParameterHistory(
-                    list(log_parameters),
-                    freq=1 if log_parameters_freq is None else log_parameters_freq
+                ParameterHistory(**log_parameters)
+            )
+        if log_functionals:
+            if not isinstance(log_functionals, dict):
+                log_functionals = FunctionalHistory.prepare_inputs(log_functionals)
+            callbacks.append(
+                FunctionalHistory(self, **log_functionals)
+            )
+        if log_loss_landscape:
+            if not isinstance(log_loss_landscape, dict):
+                log_loss_landscape = LossLandscapeHistory.prepare_inputs(log_loss_landscape)
+            callbacks.append(
+                LossLandscapeHistory(
+                    self.model, x_true, y_star, sample_weights,
+                    **log_loss_landscape
                 )
             )
-
         # training the models.
         history = opt_fit_func(
             x_true, y_star,

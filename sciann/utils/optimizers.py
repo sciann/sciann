@@ -4,7 +4,7 @@
 #   addopted by Ehsan Haghighat
 
 import numpy as np
-from scipy.optimize import minimize
+from scipy.optimize import minimize, least_squares
 from tensorflow import keras
 from tensorflow.keras import backend as K  # pylint: disable=import-error
 from tensorflow.python.keras.callbacks import BaseLogger, CallbackList, History  # pylint: disable=no-name-in-module
@@ -307,6 +307,10 @@ class ScipyOptimizer(object):
         }
         min_options = {
             'maxiter': epochs,
+            'maxfun': epochs*10,
+            'ftol': 1e-10,
+            'gtol': 1e-10,
+            'eps': 1e-8,
         }
 
         val_generator = None

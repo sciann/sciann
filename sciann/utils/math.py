@@ -683,6 +683,213 @@ def mean(x, **kwargs):
     return _apply_function(x, 'mean', **kwargs)
 
 
+def equal(f, other):
+    """Element-wise comparison applied to the `Functional` objects.
+
+    # Arguments
+        f: Functional object.
+        other: A python number or a tensor or a functional object.
+
+    # Returns
+        A Functional.
+    """
+    validate_functional(f)
+
+    inputs = f.inputs.copy()
+    if is_functional(other):
+        inputs += to_list(other.inputs)
+        lmbd = [Lambda(lambda x: K.cast_to_floatx(K.equal(x[0], x[1])), name=graph_unique_name("equal")) for X in f.outputs]
+    else:
+        _warn_for_ndarray(other)
+        lmbd = [Lambda(lambda x: K.cast_to_floatx(K.equal(x, other)), name=graph_unique_name("equal")) for X in f.outputs]
+
+    Functional = f.get_class()
+    res = Functional(
+        inputs=unique_tensors(inputs),
+        outputs=_apply_operation(lmbd, f, other),
+        layers=lmbd
+    )
+    return res
+
+
+def not_equal(f, other):
+    """Element-wise comparison applied to the `Functional` objects.
+
+    # Arguments
+        f: Functional object.
+        other: A python number or a tensor or a functional object.
+
+    # Returns
+        A Functional.
+    """
+    validate_functional(f)
+
+    inputs = f.inputs.copy()
+    if is_functional(other):
+        inputs += to_list(other.inputs)
+        lmbd = [Lambda(lambda x: K.cast_to_floatx(K.not_equal(x[0], x[1])), name=graph_unique_name("not_equal")) for X in f.outputs]
+    else:
+        _warn_for_ndarray(other)
+        lmbd = [Lambda(lambda x: K.cast_to_floatx(K.not_equal(x, other)), name=graph_unique_name("not_equal")) for X in f.outputs]
+
+    Functional = f.get_class()
+    res = Functional(
+        inputs=unique_tensors(inputs),
+        outputs=_apply_operation(lmbd, f, other),
+        layers=lmbd
+    )
+    return res
+
+
+def tol_equal(f, other, tol=1e-8):
+    """Element-wise comparison applied to the `Functional` objects.
+
+    # Arguments
+        f: Functional object.
+        other: A python number or a tensor or a functional object.
+        tol: float - defaulted to 1e-8.
+
+    # Returns
+        A Functional.
+    """
+    validate_functional(f)
+    assert isinstance(tol, float), "Expected a float for tolerance. "
+
+    inputs = f.inputs.copy()
+    if is_functional(other):
+        inputs += to_list(other.inputs)
+        lmbd = [Lambda(lambda x: K.cast_to_floatx(K.less_equal(K.abs(x[0]-x[1]), tol)),
+                       name=graph_unique_name("tol_equal")) for X in f.outputs]
+    else:
+        _warn_for_ndarray(other)
+        lmbd = [Lambda(lambda x: K.cast_to_floatx(K.less_equal(K.abs(x-other), tol)),
+                       name=graph_unique_name("tol_equal")) for X in f.outputs]
+
+    Functional = f.get_class()
+    res = Functional(
+        inputs=unique_tensors(inputs),
+        outputs=_apply_operation(lmbd, f, other),
+        layers=lmbd
+    )
+    return res
+
+
+def greater(f, other):
+    """Element-wise comparison applied to the `Functional` objects.
+
+    # Arguments
+        f: Functional object.
+        other: A python number or a tensor or a functional object.
+
+    # Returns
+        A Functional.
+    """
+    validate_functional(f)
+
+    inputs = f.inputs.copy()
+    if is_functional(other):
+        inputs += to_list(other.inputs)
+        lmbd = [Lambda(lambda x: K.cast_to_floatx(K.greater(x[0], x[1])), name=graph_unique_name("greater")) for X in f.outputs]
+    else:
+        _warn_for_ndarray(other)
+        lmbd = [Lambda(lambda x: K.cast_to_floatx(K.greater(x, other)), name=graph_unique_name("greater")) for X in f.outputs]
+
+    Functional = f.get_class()
+    res = Functional(
+        inputs=unique_tensors(inputs),
+        outputs=_apply_operation(lmbd, f, other),
+        layers=lmbd
+    )
+    return res
+
+
+def greater_equal(f, other):
+    """Element-wise comparison applied to the `Functional` objects.
+
+    # Arguments
+        f: Functional object.
+        other: A python number or a tensor or a functional object.
+
+    # Returns
+        A Functional.
+    """
+    validate_functional(f)
+
+    inputs = f.inputs.copy()
+    if is_functional(other):
+        inputs += to_list(other.inputs)
+        lmbd = [Lambda(lambda x: K.cast_to_floatx(K.greater_equal(x[0], x[1])), name=graph_unique_name("greater_equal")) for X in f.outputs]
+    else:
+        _warn_for_ndarray(other)
+        lmbd = [Lambda(lambda x: K.cast_to_floatx(K.greater_equal(x, other)), name=graph_unique_name("greater_equal")) for X in f.outputs]
+
+    Functional = f.get_class()
+    res = Functional(
+        inputs=unique_tensors(inputs),
+        outputs=_apply_operation(lmbd, f, other),
+        layers=lmbd
+    )
+    return res
+
+
+def less(f, other):
+    """Element-wise comparison applied to the `Functional` objects.
+
+    # Arguments
+        f: Functional object.
+        other: A python number or a tensor or a functional object.
+
+    # Returns
+        A Functional.
+    """
+    validate_functional(f)
+
+    inputs = f.inputs.copy()
+    if is_functional(other):
+        inputs += to_list(other.inputs)
+        lmbd = [Lambda(lambda x: K.cast_to_floatx(K.less(x[0], x[1])), name=graph_unique_name("less")) for X in f.outputs]
+    else:
+        _warn_for_ndarray(other)
+        lmbd = [Lambda(lambda x: K.cast_to_floatx(K.less(x, other)), name=graph_unique_name("less")) for X in f.outputs]
+
+    Functional = f.get_class()
+    res = Functional(
+        inputs=unique_tensors(inputs),
+        outputs=_apply_operation(lmbd, f, other),
+        layers=lmbd
+    )
+    return res
+
+
+def less_equal(f, other):
+    """Element-wise comparison applied to the `Functional` objects.
+
+    # Arguments
+        f: Functional object.
+        other: A python number or a tensor or a functional object.
+
+    # Returns
+        A Functional.
+    """
+    validate_functional(f)
+
+    inputs = f.inputs.copy()
+    if is_functional(other):
+        inputs += to_list(other.inputs)
+        lmbd = [Lambda(lambda x: K.cast_to_floatx(K.less_equal(x[0], x[1])), name=graph_unique_name("less_equal")) for X in f.outputs]
+    else:
+        _warn_for_ndarray(other)
+        lmbd = [Lambda(lambda x: K.cast_to_floatx(K.less_equal(x, other)), name=graph_unique_name("less_equal")) for X in f.outputs]
+
+    Functional = f.get_class()
+    res = Functional(
+        inputs=unique_tensors(inputs),
+        outputs=_apply_operation(lmbd, f, other),
+        layers=lmbd
+    )
+    return res
+
+
 def _apply_function(x, fname, **kwargs):
     """Apply `fname` function to x element-wise.
 
