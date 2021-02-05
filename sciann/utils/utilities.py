@@ -10,8 +10,8 @@ import numpy as np
 from numpy import pi
 
 import tensorflow as tf
-import tensorflow.python.keras as k
-import tensorflow.python.keras.backend as K
+from tensorflow.python import keras as k
+from tensorflow.python.keras import backend as K
 
 # interface for some keras features to be acessible across sciann.
 from tensorflow.python.keras.backend import is_keras_tensor as is_tensor

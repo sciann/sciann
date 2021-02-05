@@ -18,6 +18,7 @@ from .functional import Functional
 from .field import Field
 from .parameter import Parameter
 from .variable import Variable
+# from .fourier import FourierLayer
 from .radialbasis import RadialBasis
 
 from .rnn_functional import RNNFunctional

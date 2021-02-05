@@ -4,10 +4,10 @@ from __future__ import print_function
 
 from tensorflow.python.keras.layers import InputLayer
 from ..utils import floatx, set_floatx, to_list
-from .functional import Functional
+from .functional import MLPFunctional
 
 
-class Variable(Functional):
+class Variable(MLPFunctional):
     """ Configures the `Variable` object for the network's input.
 
     # Arguments
@@ -50,4 +50,5 @@ class Variable(Functional):
 
     @classmethod
     def get_class(cls):
-        return Functional
+        return MLPFunctional
+

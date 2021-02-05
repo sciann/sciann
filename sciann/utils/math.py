@@ -5,19 +5,157 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow.python.keras.backend as K
+from tensorflow.python.keras import backend as K
 graph_unique_name = K.get_graph().unique_name
 
-from tensorflow.python.keras.layers import Lambda
+from tensorflow.python.keras.layers import Lambda, Flatten, Dense
 from tensorflow.python.keras.layers import Dot
 from tensorflow.python.keras.layers import Input
 from tensorflow.python.keras.models import Model
+from tensorflow import sin as tf_sin
+from tensorflow import cos as tf_cos
+from tensorflow import tile as tf_tile
+from tensorflow import pow as tf_pow
 
 from tensorflow import gradients as tf_gradients
 from tensorflow import stop_gradient as tf_stop_gradient
+from tensorflow import multiply, expand_dims
 
 from .utilities import *
 from .validations import *
+
+
+def fourier(f, w=10):
+    """Apply Fourier transform to the `Variable` objects..
+
+    # Arguments
+        w: (Int, np.ndarray) Frequencies of transformation.
+
+    # Returns
+        A Functional.
+    """
+    validate_variable(f)
+    layers = []
+    outputs = []
+    for fi in f.outputs:
+        if isinstance(w, int):
+            w = 2*np.pi/np.random.rand(w)
+        else:
+            assert isinstance(w, np.ndarray)
+        size_i = fi.shape.as_list()
+        assert len(size_i) == 2, 'Designed for the MLP model.'
+        assert size_i[-1] == 1, 'Only supported now.'
+        layers.append(
+            Dense(
+                w.size,
+                use_bias=False,
+                trainable=False,
+                activation=tf_sin,
+                name=graph_unique_name("fourier-sin")
+            )
+        )
+        outputs.append(layers[-1](fi))
+        layers[-1].set_weights(
+            [w.reshape(layers[-1].weights[0].shape.as_list())]
+        )
+        layers.append(
+            Dense(
+                w.size,
+                use_bias=False,
+                trainable=False,
+                activation=tf_cos,
+                name=graph_unique_name("fourier-cos")
+            )
+        )
+        outputs.append(layers[-1](fi))
+        layers[-1].set_weights(
+            [w.reshape(layers[-1].weights[0].shape.as_list())]
+        )
+
+    Functional = f.get_class()
+    res = Functional(
+        inputs=unique_tensors(f.inputs.copy()),
+        outputs=outputs,
+        layers=layers
+    )
+
+    return res
+
+
+def monomial(f, p=10):
+    """Apply monomial feature transformation to the `Variable` objects..
+
+    # Arguments
+        p: (Int, list) monial powers to be considered.
+
+    # Returns
+        A Functional.
+    """
+    validate_variable(f)
+    if isinstance(p, int):
+        p = list(range(1, p+1))
+    else:
+        assert isinstance(p, list)
+    layers = []
+    outputs = []
+    for fi in f.outputs:
+        f_dim = fi.shape.as_list()
+        tile_dim = (len(f_dim)-1)*[1] + [len(p)]
+        layers.append(
+            Lambda(lambda ys: tf_pow(tf_tile(ys, tile_dim), p),
+                   name=graph_unique_name("monomials"))
+        )
+        outputs.append(
+            layers[-1](fi)
+        )
+
+    Functional = f.get_class()
+    res = Functional(
+        inputs=unique_tensors(f.inputs.copy()),
+        outputs=outputs,
+        layers=layers
+    )
+
+    return res
+
+
+def outer(a, b):
+    """outer product of two `Functional` objects.
+
+    # Arguments
+        a, b: outer(a,b)
+        Note that at least one of them should be of type Functional.
+
+    # Returns
+        A Functional.
+    """
+    validate_functional(a)
+    validate_functional(b)
+    layers = []
+    outputs = []
+    for a_out in a.outputs:
+        for b_out in b.outputs:
+            a_shape = a_out.shape.as_list()
+            b_shape = b_out.shape.as_list()
+            a_exp = len(a_shape)
+            b_exp = 1 if b_shape[0] is None else 0
+            name = graph_unique_name("outer")
+            layers.append(
+                Lambda(lambda ys: multiply(expand_dims(ys[0], a_exp),
+                                           expand_dims(ys[1], b_exp)), name=name)
+            )
+            net_output = layers[-1]([a_out, b_out])
+            layers.append(Flatten())
+            outputs.append(layers[-1](net_output))
+    # return the functional
+    assert a.get_class() == b.get_class()
+    Functional = a.get_class()
+    res = Functional(
+        inputs=unique_tensors(a.inputs.copy() + b.inputs.copy()),
+        outputs=outputs,
+        layers=layers
+    )
+    return res
 
 
 def pow(a, b):

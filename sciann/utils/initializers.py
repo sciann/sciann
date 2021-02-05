@@ -1,5 +1,5 @@
 
-import tensorflow.python.keras as k
+from tensorflow.python import keras as k
 
 
 class SciKernelInitializer(k.initializers.VarianceScaling):

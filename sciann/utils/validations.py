@@ -22,7 +22,8 @@ def is_functional(f):
         ValueError: if the object cannot be tested with `isinstance`.
 
     """
-    if isinstance(f, (sciann.Functional, sciann.functionals.RNNFunctional)):
+    if isinstance(f, (sciann.functionals.mlp_functional.MLPFunctional,
+                      sciann.functionals.rnn_functional.RNNFunctional)):
         return True
 
     else:
@@ -42,7 +43,8 @@ def validate_functional(f):
         ValueError: if the object is not a Functional object.
 
     """
-    if isinstance(f, (sciann.Functional, sciann.functionals.rnn_functional.RNNFunctional)):
+    if isinstance(f, (sciann.functionals.mlp_functional.MLPFunctional,
+                      sciann.functionals.rnn_functional.RNNFunctional)):
         return True
 
     else:

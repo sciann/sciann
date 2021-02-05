@@ -11,7 +11,7 @@ from ..utils import default_regularizer
 from ..utils import floatx, set_floatx
 
 
-class RNNField(TimeDistributed):
+class RNNField(Dense):
     """ Configures the `LSTMField` class for the model outputs.
 
     # Arguments
@@ -67,55 +67,53 @@ class RNNField(TimeDistributed):
         kernel_regularizer = default_regularizer(kernel_regularizer)
         bias_regularizer = default_regularizer(bias_regularizer)
 
-        if rnn_type == 'SimpleRNN':
-            super(RNNField, self).__init__(
-                SimpleRNN(
-                    units=units,
-                    activation=activation,
-                    return_sequences=True,
-                    kernel_initializer=kernel_initializer,
-                    recurrent_initializer=recurrent_initializer,
-                    bias_initializer=bias_initializer,
-                    kernel_regularizer=kernel_regularizer,
-                    recurrent_regularizer=recurrent_regularizer,
-                    bias_regularizer=bias_regularizer,
-                    trainable=trainable,
-                    dtype=dtype,
-                    unroll=True,
-                    name=name
-                )
-            )
-        elif rnn_type == 'LSTM':
-            super(RNNField, self).__init__(
-                LSTM(
-                    units=units,
-                    activation=activation,
-                    return_sequences=True,
-                    kernel_initializer=kernel_initializer,
-                    recurrent_initializer=recurrent_initializer,
-                    bias_initializer=bias_initializer,
-                    kernel_regularizer=kernel_regularizer,
-                    recurrent_regularizer=recurrent_regularizer,
-                    bias_regularizer=bias_regularizer,
-                    trainable=trainable,
-                    dtype=dtype,
-                    unroll=True,
-                    name=name
-                )
-            )
-        elif rnn_type == 'Dense':
-            super(RNNField, self).__init__(
-                Dense(
-                    units=units,
-                    activation=activation,
-                    kernel_initializer=kernel_initializer,
-                    bias_initializer=bias_initializer,
-                    kernel_regularizer=kernel_regularizer,
-                    bias_regularizer=bias_regularizer,
-                    trainable=trainable,
-                    dtype=dtype,
-                    name=name
-                )
-            )
-        else:
-            raise NotImplementedError('Supported RNNType: (SimpleRNN, LSTM, Dense)')
+        # if rnn_type == 'SimpleRNN':
+        #     super(RNNField, self).__init__(
+        #         SimpleRNN(
+        #             units=units,
+        #             activation=activation,
+        #             return_sequences=True,
+        #             kernel_initializer=kernel_initializer,
+        #             recurrent_initializer=recurrent_initializer,
+        #             bias_initializer=bias_initializer,
+        #             kernel_regularizer=kernel_regularizer,
+        #             recurrent_regularizer=recurrent_regularizer,
+        #             bias_regularizer=bias_regularizer,
+        #             trainable=trainable,
+        #             dtype=dtype,
+        #             unroll=True,
+        #             name=name
+        #         )
+        #     )
+        # elif rnn_type == 'LSTM':
+        #     super(RNNField, self).__init__(
+        #         LSTM(
+        #             units=units,
+        #             activation=activation,
+        #             return_sequences=True,
+        #             kernel_initializer=kernel_initializer,
+        #             recurrent_initializer=recurrent_initializer,
+        #             bias_initializer=bias_initializer,
+        #             kernel_regularizer=kernel_regularizer,
+        #             recurrent_regularizer=recurrent_regularizer,
+        #             bias_regularizer=bias_regularizer,
+        #             trainable=trainable,
+        #             dtype=dtype,
+        #             unroll=True,
+        #             name=name
+        #         )
+        #     )
+        # elif rnn_type == 'Dense':
+        super(RNNField, self).__init__(
+            units=units,
+            activation=activation,
+            kernel_initializer=kernel_initializer,
+            bias_initializer=bias_initializer,
+            kernel_regularizer=kernel_regularizer,
+            bias_regularizer=bias_regularizer,
+            trainable=trainable,
+            dtype=dtype,
+            name=name
+        )
+        # else:
+        #     raise NotImplementedError('Supported RNNType: (SimpleRNN, LSTM, Dense)')

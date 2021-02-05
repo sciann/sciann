@@ -5,7 +5,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow.python.keras.backend as K
+from tensorflow.python.keras import backend as K
 graph_unique_name = K.get_graph().unique_name
 
 from tensorflow.python.keras.layers import Dense, LSTM, SimpleRNN
@@ -200,7 +200,7 @@ class RNNFunctional(object):
                 if rnn_type=='LSTM':
                     layer = LSTM(
                         nNeuron,
-                        return_sequences=True,
+                        return_sequences=False if nLay == len(hidden_layers)-1 else True,
                         activation=None,
                         recurrent_activation=recurrent_activation,
                         kernel_initializer=kernel_initializer[nLay],
@@ -218,7 +218,7 @@ class RNNFunctional(object):
                     layer = SimpleRNN(
                         nNeuron,
                         activation=None,
-                        return_sequences=True,
+                        return_sequences=False if nLay == len(hidden_layers)-1 else True,
                         kernel_initializer=kernel_initializer[nLay],
                         recurrent_initializer=recurrent_initializer[nLay],
                         bias_initializer=bias_initializer[nLay],

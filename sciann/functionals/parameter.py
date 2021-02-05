@@ -5,9 +5,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow.python.keras as k
+from tensorflow.python import keras as k
 
-import tensorflow.python.keras.backend as K
+from tensorflow.python.keras import backend as K
 graph_unique_name = K.get_graph().unique_name
 
 from tensorflow.python.keras.layers import Dense
@@ -24,11 +24,11 @@ from ..utils import to_list
 from ..utils import default_constant_initializer
 from ..utils import default_regularizer
 
-from .functional import Functional
+from .functional import MLPFunctional
 from .variable import Variable
 
 
-class Parameter(Functional):
+class Parameter(MLPFunctional):
     """ Parameter functional to be used for parameter inversion.
         Inherited from Dense layer.
 
@@ -55,7 +55,7 @@ class Parameter(Functional):
                  non_neg=None):
 
         inputs = to_list(inputs)
-        if not all([isinstance(x, (Variable, Functional)) for x in inputs]):
+        if not all([isinstance(x, (Variable, MLPFunctional)) for x in inputs]):
             raise TypeError
 
         input_tensors, layers = [], []
@@ -84,7 +84,7 @@ class Parameter(Functional):
 
     @classmethod
     def get_class(cls):
-        return Functional
+        return MLPFunctional
 
     @property
     def name(self):

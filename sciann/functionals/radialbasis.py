@@ -2,7 +2,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow.python.keras.backend as K
+from tensorflow.python.keras import backend as K
 graph_unique_name = K.get_graph().unique_name
 
 from tensorflow.python.keras.layers import InputLayer
@@ -10,11 +10,11 @@ from tensorflow.python.keras.layers import InputLayer
 from ..utils import to_list
 from ..utils import Lambda
 
-from .functional import Functional
+from .functional import MLPFunctional
 from .variable import Variable
 
 
-class RadialBasis(Functional):
+class RadialBasis(MLPFunctional):
     """ Radial Basis functional class.
     """
     def __init__(self, vars, rb_vars, radii):
@@ -63,10 +63,10 @@ class RadialBasis(Functional):
 
     @classmethod
     def get_class(cls):
-        return Functional
+        return MLPFunctional
 
 
-class RadialBasisBase(Functional):
+class RadialBasisBase(MLPFunctional):
     """ Configures the `RadialBasisBase` object for the network's input.
 
     # Arguments
@@ -113,4 +113,4 @@ class RadialBasisBase(Functional):
 
     @classmethod
     def get_class(cls):
-        return Functional
+        return MLPFunctional
