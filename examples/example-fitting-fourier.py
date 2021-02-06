@@ -31,7 +31,7 @@ xf = sn.fourier(x, 10)
 # Each network is defined by Functional.
 y1 = sn.Field('y1', 10)
 y2 = sn.Field('y2', 10)
-y1, y2 = sn.Functional([y1,y2], xf, [10, 10, 10], 'tanh', output_activation='tanh')
+y1, y2 = sn.Functional([y1,y2], xf, [10, 10, 10], 'l-tanh', output_activation='tanh')
 
 y = sn.Functional('y', [xf*y1, xf*y2])
 
@@ -59,3 +59,4 @@ history = model.train(
 y_pred = y.eval(model, x_true)
 d_pred = d.eval(model, x_true)
 
+sn.get_bibliography(format="bibtex")  #bibtexml

@@ -25,6 +25,7 @@ from .utils.utilities import reset_session, clear_session
 from .utils.utilities import set_default_log_path, get_default_log_path
 from .utils.utilities import set_random_seed
 from .utils.utilities import set_floatx
+from .utils.utilities import get_bibliography
 
 # SciANN.
 __author__ = "Ehsan Haghighat"
@@ -33,17 +34,15 @@ __copyright__ = "Copyright 2019, Physics-Informed Deep Learning"
 __credits__ = []
 __url__ = "http://github.com/sciann/sciann]"
 __license__ = "MIT"
-__version__ = "0.6.0.0"
+__version__ = "0.6.0.1"
 __cite__ = \
-    '@misc{haghighat2019sciann, \n' +\
-    '    title={SciANN: A Keras/Tensorflow wrapper for scientific computations and physics-informed deep learning using artificial neural networks}, \n' +\
-    '    author={Ehsan Haghighat and Ruben Juanes}, \n' +\
-    '    year={2020}, \n' +\
-    '    eprint={2005.08803}, \n' +\
-    '    archivePrefix={arXiv}, \n' +\
-    '    primaryClass={cs.OH}, \n' +\
-    '    url = {https://arxiv.org/abs/2005.08803}' +\
-    '    howpublished={https://github.com/sciann/sciann.git}' +\
+    '@article{haghighat2021sciann, \n' +\
+    '    title={SciANN: A Keras/TensorFlow wrapper for scientific computations and physics-informed deep learning using artificial neural networks}, \n' +\
+    '    author={Haghighat, Ehsan and Juanes, Ruben}, \n' +\
+    '    journal={Computer Methods in Applied Mechanics and Engineering}, \n' +\
+    '    year={2021}, \n' +\
+    '    url = {https://doi.org/10.1016/j.cma.2020.113552}, \n' +\
+    '    howpublished={https://github.com/sciann/sciann.git}, \n' +\
     '}'
 
 # Import message.
@@ -67,3 +66,4 @@ else:
 
 # set default logging directory.
 set_default_log_path(os.path.join(os.getcwd(), "logs"))
+initialize_bib(os.path.join(os.path.dirname(__file__), 'references', 'bibliography'))

@@ -29,7 +29,13 @@ from .initializers import SciKernelInitializer as KInitializer
 from .initializers import SciBiasInitializer as BInitializer
 from .activations import get_activation, SciActivation, SciActivationLayer
 
+from pybtex.database.input import bibtex
+
+
 _DEFAULT_LOG_PATH = ""
+_BIBLIOGRAPHY = None
+_BIBLIOGRAPHY_TO_OUTPUT = []
+
 
 def _is_tf_1():
     return tf.__version__.startswith('1.')
@@ -68,6 +74,45 @@ def set_default_log_path(path):
 
 def get_default_log_path():
     return _DEFAULT_LOG_PATH
+
+
+def initialize_bib(bib_file):
+    global _BIBLIOGRAPHY
+    global _BIBLIOGRAPHY_TO_OUTPUT
+    _BIBLIOGRAPHY = bibtex.Parser().parse_file(bib_file)
+    _BIBLIOGRAPHY_TO_OUTPUT.append(_BIBLIOGRAPHY.entries['haghighat2021sciann'])
+    _BIBLIOGRAPHY_TO_OUTPUT.append(_BIBLIOGRAPHY.entries['raissi2019physics'])
+
+
+def append_to_bib(bib_entery):
+    global _BIBLIOGRAPHY
+    global _BIBLIOGRAPHY_TO_OUTPUT
+    bib = _BIBLIOGRAPHY.entries[bib_entery]
+    if bib not in _BIBLIOGRAPHY_TO_OUTPUT:
+        _BIBLIOGRAPHY_TO_OUTPUT.append(bib)
+
+
+def get_bibliography(format='bibtex', file_name=None):
+    """Returns the bibliography based on the feastures you used in your model.
+
+    # Argument
+        format: 'bibtex', 'bibtextml', 'yaml', ...
+            check `pybtex` documentation for other options.
+            default: 'bibtex'
+        file_name: path to a file.
+            default: None. This results in printing the bib file in the outputs.
+    """
+    global _BIBLIOGRAPHY_TO_OUTPUT
+    bib = ""
+    for b in _BIBLIOGRAPHY_TO_OUTPUT:
+        bib += str(b.to_string(format)) + '\n'
+
+    if file_name is None:
+        print(bib)
+    else:
+        with open(file_name,'w') as f:
+            f.write(bib)
+            f.close()
 
 
 def get_log_path(path=None, prefix=None):
@@ -169,6 +214,7 @@ def prepare_default_activations_and_initializers(actfs, seed=None):
         if len(lay_actf) == 1:
             activations.append(SciActivation(w, f))
         else:
+            append_to_bib("jagtap2020locally")
             activations.append(SciActivationLayer(w, f))
 
     return activations, bias_initializer, kernel_initializer

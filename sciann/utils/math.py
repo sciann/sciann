@@ -35,6 +35,7 @@ def fourier(f, w=10):
         A Functional.
     """
     validate_variable(f)
+    append_to_bib("wang2020eigenvector")
     layers = []
     outputs = []
     for fi in f.outputs:

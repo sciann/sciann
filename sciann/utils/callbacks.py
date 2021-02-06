@@ -14,6 +14,7 @@ from tensorflow.python.util.tf_export import keras_export
 import numpy as np
 
 from .utilities import unpack_singleton, to_list, get_log_path
+from .utilities import append_to_bib
 from .math import tf_gradients
 
 
@@ -60,6 +61,7 @@ class GradientPathologyLossWeight(Callback):
                  beta=0.1, freq=100, log_freq=None,
                  hessian=False, types=None, **kwargs):
         super(GradientPathologyLossWeight, self).__init__()
+        append_to_bib("wang2020gp")
         # limit number of samples for performance concerns.
         if inputs[0].shape[0] > 20000:
             sample_ids = np.random.choice(inputs[0].shape[0], 20000, replace=False)
@@ -358,6 +360,7 @@ class LossLandscapeHistory(Callback):
                  norm=2, resolution=11, layer_wise=True,
                  path=None, trials=1):
         super(LossLandscapeHistory, self).__init__()
+        append_to_bib("li2017visualizing")
         self._model = model
         self._inputs = inputs
         self._layers = [layer for layer in model._layers if layer.weights]
@@ -491,6 +494,7 @@ class NTKLossWeight(Callback):
                  beta=0.1, freq=100, log_freq=None,
                  hessian=False, types=None, **kwargs):
         super(NTKLossWeight, self).__init__()
+        append_to_bib("wang2020ntk")
         if weights is None:
             weights = [np.ones(inputs[0].shape[0]) for i in range(len(model.outputs))]
         # limit number of samples for performance concerns.
