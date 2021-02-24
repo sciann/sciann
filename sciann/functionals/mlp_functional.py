@@ -21,7 +21,7 @@ from ..utils import default_regularizer
 from ..utils import validations, getitem
 from ..utils import floatx, set_floatx
 from ..utils import math
-from ..utils.transformers import FourierFeature
+# from ..utils.transformers import FourierFeature
 from ..utils.activations import SciActivation, get_activation
 from ..utils import prepare_default_activations_and_initializers
 

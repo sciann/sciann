@@ -169,7 +169,8 @@ class GradientPathologyLossWeight(Callback):
         # evaluate new weights
         new_weights = []
         for i, type in enumerate(self.types):
-            new_weights.append(normalization_grad / ref_grad[i])
+            ref_grad_i = ref_grad[i] if ref_grad[i] != 0. else np.mean(ref_grad)
+            new_weights.append(normalization_grad / ref_grad_i)
         return new_weights
 
     def update_loss_weights(self, epoch, updated_grads):
@@ -592,7 +593,8 @@ class NTKLossWeight(Callback):
         # evaluate new weights
         new_weights = []
         for i, type in enumerate(self.types):
-            new_weights.append(normalization_grad / ref_grad[i])
+            ref_grad_i = ref_grad[i] if ref_grad[i] != 0. else np.mean(ref_grad)
+            new_weights.append(normalization_grad / ref_grad_i)
         return new_weights
 
     def update_loss_weights(self, epoch, updated_grads):
