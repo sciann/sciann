@@ -19,7 +19,7 @@ from tensorflow import gradients as tf_gradients
 
 from ..utils import unpack_singleton, to_list
 from ..utils import is_variable, is_constraint, is_functional
-from ..utils.optimizers import GradientObserver, ScipyOptimizer
+from ..utils.optimizers import GradientObserver, ScipyOptimizer, GeneratorWrapper
 from ..utils.callbacks import *
 
 from ..functionals import Variable
@@ -212,13 +212,14 @@ class SciModel(object):
 
     def train(self,
               x_true,
-              y_true,
+              y_true=None,
               weights=None,
               target_weights=None,
               batch_size=2**6,
               epochs=100,
               learning_rate=0.001,
               adaptive_weights=None,
+              adaptive_sample_weights=None,
               log_loss_gradients=None,
               shuffle=True,
               callbacks=None,
@@ -239,6 +240,7 @@ class SciModel(object):
 
         # Arguments
             x_true: list of `Xs` associated to targets of `Y`.
+                Alternatively, you can pass a Sequence object (keras.utils.Sequence).
                 Expecting a list of np.ndarray of size (N,1) each,
                 with N as the sample size.
             y_true: list of true `Ys` associated to the targets defined during model setup.
@@ -304,6 +306,72 @@ class SciModel(object):
         # Returns
             A Keras 'History' object after performing fitting.
         """
+        if isinstance(x_true, Sequence):
+            if y_true is not None:
+                raise ValueError(
+                    'If data_generator is provided, you should not provide y_true.'
+                )
+            data_generator = x_true
+
+        else:
+            if None in (x_true, y_true):
+                raise ValueError
+            # prepare X,Y data.
+            x_true = to_list(x_true)
+            for i, (x, xt) in enumerate(zip(x_true, self._model.inputs)):
+                x_shape = tuple(xt.get_shape().as_list())
+                if x.shape != x_shape:
+                    try:
+                        x_true[i] = x.reshape((-1,) + x_shape[1:])
+                    except:
+                        print(
+                            'Could not automatically convert the inputs to be ' 
+                            'of the same size as the expected input tensors. ' 
+                            'Please provide inputs of the same dimension as the `Variables`. '
+                        )
+                        assert False
+
+            num_sample = x_true[0].shape[0]
+            assert all([x.shape[0]==num_sample for x in x_true[1:]]), \
+                'Inconsistent sample size among `Xs`. '
+            ids_all = np.arange(0, num_sample)
+
+            if weights is None:
+                weights = np.ones(num_sample)
+            else:
+                if len(weights.shape)!=1 or \
+                        weights.shape[0] != num_sample:
+                    try:
+                        weights = weights.reshape(num_sample)
+                    except:
+                        raise ValueError(
+                            'Input error: `weights` should have dimension 1 with '
+                            'the same sample length as `Xs. '
+                        )
+
+            y_true = to_list(y_true)
+            assert len(y_true)==len(self._constraints), \
+                'Miss-match between expected targets (constraints) defined in `SciModel` and ' \
+                'the provided `y_true`s - expecting the same number of data points. '
+
+            sample_weights, y_star = [], []
+            for i, yt in enumerate(y_true):
+                c = self._constraints[i]
+                # verify entry.
+                ys, wei = SciModel._prepare_data(
+                    c.cond.outputs, to_list(yt),
+                    weights, num_sample, default_zero_weight
+                )
+                # add to the list.
+                y_star += ys
+                sample_weights += wei
+
+            # create Sequence wrapper for training. 
+            data_generator = GeneratorWrapper(
+                x_true, y_true, sample_weights, 
+                batch_size, shuffle
+            )
+
         if callbacks is None:
             # default_lr = learning_rate/0.9900
             # f0 = np.log(1.0/0.9900 - 1.0)
@@ -347,68 +415,18 @@ class SciModel(object):
                 EarlyStoppingByLossVal(stop_loss_value),
                 EarlyStoppingByLearningRate(stop_lr_value),
             ]
-        # prepare X,Y data.
-        x_true = to_list(x_true)
-        for i, (x, xt) in enumerate(zip(x_true, self._model.inputs)):
-            x_shape = tuple(xt.get_shape().as_list())
-            if x.shape != x_shape:
-                try:
-                    x_true[i] = x.reshape((-1,) + x_shape[1:])
-                except:
-                    print(
-                        'Could not automatically convert the inputs to be ' 
-                        'of the same size as the expected input tensors. ' 
-                        'Please provide inputs of the same dimension as the `Variables`. '
-                    )
-                    assert False
-
-        num_sample = x_true[0].shape[0]
-        assert all([x.shape[0]==num_sample for x in x_true[1:]]), \
-            'Inconsistent sample size among `Xs`. '
-        ids_all = np.arange(0, num_sample)
-
-        if weights is None:
-            weights = np.ones(num_sample)
-        else:
-            if len(weights.shape)!=1 or \
-                    weights.shape[0] != num_sample:
-                try:
-                    weights = weights.reshape(num_sample)
-                except:
-                    raise ValueError(
-                        'Input error: `weights` should have dimension 1 with '
-                        'the same sample length as `Xs. '
-                    )
-
-        y_true = to_list(y_true)
-        assert len(y_true)==len(self._constraints), \
-            'Miss-match between expected targets (constraints) defined in `SciModel` and ' \
-            'the provided `y_true`s - expecting the same number of data points. '
-
-        sample_weights, y_star = [], []
-        for i, yt in enumerate(y_true):
-            c = self._constraints[i]
-            # verify entry.
-            ys, wei = SciModel._prepare_data(
-                c.cond.outputs, to_list(yt),
-                weights, num_sample, default_zero_weight
-            )
-            # add to the list.
-            y_star += ys
-            sample_weights += wei
-
+        
+        len_inputs = len(to_list(self._model.inputs))
+        len_outputs = len(to_list(self._model.outputs))
         if target_weights is not None:
             if not(isinstance(target_weights, list) and
-                   len(target_weights) == len(y_true)):
+                   len(target_weights) == len_outputs):
                 raise ValueError(
                     'Expected a list of weights for the same size as the targets '
                     '- was provided {}'.format(target_weights)
                 )
-            else:
-                for i, cw in enumerate(target_weights):
-                    sample_weights[i] *= cw
         else:
-            target_weights = len(y_true) * [1.0]
+            target_weights = len_outputs * [1.0]
 
         # save model.
         model_file_path = None
@@ -438,7 +456,7 @@ class SciModel(object):
             if adaptive_weights["method"] == "GP":
                 callbacks.append(
                     GradientPathologyLossWeight(
-                        self.model, x_true, y_star, sample_weights, 
+                        self.model, data_generator=data_generator, 
                         types=[type(v).__name__ for v in self.constraints],
                         **adaptive_weights
                     ),
@@ -446,7 +464,7 @@ class SciModel(object):
             elif adaptive_weights["method"] == "NTK":
                 callbacks.append(
                     NTKLossWeight(
-                        self.model, x_true, y_star, sample_weights, 
+                        self.model, data_generator=data_generator, 
                         types=[type(v).__name__ for v in self.constraints],
                         **adaptive_weights
                     ),
@@ -456,231 +474,26 @@ class SciModel(object):
                     'adaptive_weights method should be either of the followings: (GP, NTK)'
                 )
 
-        if log_loss_gradients:
-            if not isinstance(log_loss_gradients, dict):
-                log_loss_gradients = LossGradientHistory.prepare_inputs(log_loss_gradients)
+        if adaptive_sample_weights:
+            if not isinstance(adaptive_sample_weights, dict):
+                adaptive_sample_weights = NTKSampleWeight.prepare_inputs(adaptive_sample_weights)
+            # sample_weights = [K.variable(wi) for wi in sample_weights]
             callbacks.append(
-                LossGradientHistory(
-                    self.model, x_true, y_star, sample_weights,
-                    **log_loss_gradients
-                )
-            )
-        if log_parameters:
-            if not isinstance(log_parameters, dict):
-                log_parameters = ParameterHistory.prepare_inputs(log_parameters)
-            callbacks.append(
-                ParameterHistory(**log_parameters)
-            )
-        if log_functionals:
-            if not isinstance(log_functionals, dict):
-                log_functionals = FunctionalHistory.prepare_inputs(log_functionals)
-            callbacks.append(
-                FunctionalHistory(**log_functionals)
-            )
-        if log_loss_landscape:
-            if not isinstance(log_loss_landscape, dict):
-                log_loss_landscape = LossLandscapeHistory.prepare_inputs(log_loss_landscape)
-            callbacks.append(
-                LossLandscapeHistory(
-                    self.model, x_true, y_star, sample_weights,
-                    **log_loss_landscape
-                )
-            )
-        # training the models.
-        history = opt_fit_func(
-            x_true, y_star,
-            sample_weight=sample_weights,  # sums to number of samples.
-            epochs=epochs,
-            batch_size=batch_size,
-            shuffle=shuffle,
-            callbacks=callbacks,
-            validation_data=validation_data,
-            **kwargs
-        )
-
-        if save_weights_to is not None:
-            try:
-                self._model.save_weights("{}-end.hdf5".format(save_weights_to))
-            except:
-                print("\nWARNING: Failed to save model.weights to the provided path: {}\n".format(save_weights_to))
-
-        # return the history.
-        return history
-
-
-    def train_generator(self,
-                        data_generator,
-                        weights=None,
-                        target_weights=None,
-                        batch_size=2**6,
-                        epochs=100,
-                        learning_rate=0.001,
-                        adaptive_weights=None,
-                        log_loss_gradients=None,
-                        shuffle=True,
-                        callbacks=None,
-                        stop_lr_value=1e-8,
-                        reduce_lr_after=None,
-                        reduce_lr_min_delta=0.,
-                        stop_after=None,
-                        stop_loss_value=1e-8,
-                        log_parameters=None,
-                        log_functionals=None,
-                        log_loss_landscape=None,
-                        save_weights_to=None,
-                        save_weights_freq=0,
-                        default_zero_weight=0.0,
-                        validation_data=None,
-                        **kwargs):
-        """Performs the training on the model.
-
-        # Arguments
-            data_generator: Object of type keras.utils.Sequence.
-            target_weights: (list) A weight for each target defined in `y_true`.
-            epochs: (Integer) Number of epochs to train the model.
-                Defaulted to 100.
-                An epoch is an iteration over the entire `x` and `y`
-                data provided.
-            learning_rate: (Tuple/List) (epochs, lrs).
-                Expects a list/tuple with a list of epochs and a list or learning rates.
-                It linearly interpolates between entries.
-                Defaulted to 0.001 with no decay.
-                Example:
-                    learning_rate = ([0, 100, 1000], [0.001, 0.0005, 0.00001])
-            adaptive_weights: Pass a Dict with the following keys:
-                . freq: Freq to update the weights.
-                . log_freq: Freq to log the weights and gradients in the history object.
-                . beta: The beta parameter in from Gradient Pathology paper.
-            log_loss_gradients: Pass a Dict with the following keys:
-                . freq: Freq of logs. Defaulted to 100.
-                . path: Path to log the gradients.
-            callbacks: List of `keras.callbacks.Callback` instances.
-            reduce_lr_after: patience to reduce learning rate or stop after certain missed epochs.
-                Defaulted to epochs max(10, epochs/10).
-            stop_lr_value: stop the training if learning rate goes lower than this value.
-                Defaulted to 1e-8.
-            reduce_lr_min_delta: min absolute change in total loss value that is considered a successful change.
-                Defaulted to 0.001.
-                This values affects number of failed attempts to trigger reduce learning rate based on reduce_lr_after.
-            stop_after: To stop after certain missed epochs. Defaulted to total number of epochs.
-            stop_loss_value: The minimum value of the total loss that stops the training automatically.
-                Defaulted to 1e-8.
-            log_parameters: Dict object expecting the following keys:
-                . parameters: pass list of parameters.
-                . freq: pass freq of outputs.
-            log_functionals: Dict object expecting the following keys:
-                . functionals: List of functionals to log their training history.
-                . inputs: The input grid to evaluate the value of each functional.
-                          Should be of the same size as the inputs to the model.train.
-                . path: Path to the location that the csv files will be logged.
-                . freq: Freq of logging the functionals.
-            log_loss_landscape: Dict object expecting the following arguments:
-                . norm: defaulted to 2.
-                . resolution: defaulted to 10.
-                . path: Path to the location that the csv files will be logged.
-                . freq: Freq of logging the loss landscape.
-            save_weights_to: (file_path) If you want to save the state of the model (at the end of the training).
-            save_weights_freq: (Integer) Save weights every N epcohs.
-                Defaulted to 0.
-            default_zero_weight: a small number for zero sample-weight.
-
-        # Returns
-            A Keras 'History' object after performing fitting.
-        """
-        assert isinstance(data_generator, Sequence)
-        x_true, y_star, sample_weights = data_generator.get_data()
-        if callbacks is None:
-            # default_lr = learning_rate/0.9900
-            # f0 = np.log(1.0/0.9900 - 1.0)
-            # f1 = np.log(1.0/decay_max - 1.0)
-            # decay_epochs = epochs if decay_epochs is None else decay_epochs
-            # a0 = decay_epochs / (f1-f0)
-            # n0 = -a0*f0
-            if reduce_lr_after is None:
-                reduce_lr_after = max([10, epochs/10])
-            if stop_after is None:
-                stop_after = epochs
-            callbacks = []
-            if isinstance(learning_rate, (type(None), float, int)):
-                lr_rates = 0.001 if learning_rate is None else learning_rate
-                K.set_value(self.model.optimizer.lr, lr_rates)
-                callbacks.append(
-                    k.callbacks.ReduceLROnPlateau(
-                        monitor='loss', factor=0.5,
-                        patience=reduce_lr_after, #cooldown=epochs/10,
-                        verbose=1, mode='auto',
-                        min_delta=reduce_lr_min_delta,
-                        min_lr=0.
-                    )
-                )
-            elif isinstance(learning_rate, (tuple, list)):
-                lr_epochs = learning_rate[0]
-                lr_rates = learning_rate[1]
-                callbacks.append(
-                    # k.callbacks.LearningRateScheduler(lambda n: default_lr/(1.0 + np.exp((n-n0)/a0))),
-                    k.callbacks.LearningRateScheduler(lambda n: np.interp(n, lr_epochs, lr_rates))
-                )
-            else:
-                raise ValueError(
-                    "learning rate: expecting a `float` or a tuple/list of two arrays"
-                    " with `epochs` and `learning rates`"
-                )
-            callbacks += [
-                k.callbacks.EarlyStopping(monitor="loss", mode='auto', verbose=1,
-                                          patience=stop_after, min_delta=1e-9),
-                k.callbacks.TerminateOnNaN(),
-                EarlyStoppingByLossVal(stop_loss_value),
-                EarlyStoppingByLearningRate(stop_lr_value),
-            ]
-        len_inputs = self._model
-        if target_weights is not None:
-            if not(isinstance(target_weights, list) and
-                   len(target_weights) == len(y_star)):
-                raise ValueError(
-                    'Expected a list of weights for the same size as the targets '
-                    '- was provided {}'.format(target_weights)
-                )
-        else:
-            target_weights = len(y_star) * [1.0]
-
-        # save model.
-        model_file_path = None
-        if save_weights_to is not None:
-            try:
-                self._model.save_weights("{}-start.hdf5".format(save_weights_to))
-                model_file_path = save_weights_to + "-{epoch:05d}-{loss:.3e}.hdf5"
-                model_check_point = k.callbacks.ModelCheckpoint(
-                    model_file_path, monitor='loss', save_weights_only=True, mode='auto',
-                    period=10 if save_weights_freq==0 else save_weights_freq,
-                    save_best_only=True if save_weights_freq==0 else False
-                )
-            except:
-                print("\nWARNING: Failed to save model.weights to the provided path: {}\n".format(save_weights_to))
-        if model_file_path is not None:
-            callbacks.append(model_check_point)
-
-        if isinstance(self._model.optimizer, GradientObserver):
-            raise ValueError
-        else:
-            opt_fit_func = self._model.fit_generator
-
-        if adaptive_weights:
-            if not isinstance(adaptive_weights, dict):
-                adaptive_weights = NTKLossWeight.prepare_inputs(adaptive_weights)
-            callbacks.append(
-                NTKLossWeight(
-                    self.model, x_true, y_star, sample_weights,
+                AdaptiveSampleWeight(
+                    self.model, data_generator=data_generator,
                     types=[type(v).__name__ for v in self.constraints],
-                    **adaptive_weights
-                ),
+                    **adaptive_sample_weights
+                )
             )
+            # loss_gradients = NTKSW.eval_diag_ntk()
+            # sample_weights = NTKSW.eval_sample_weights(loss_gradients)
 
         if log_loss_gradients:
             if not isinstance(log_loss_gradients, dict):
                 log_loss_gradients = LossGradientHistory.prepare_inputs(log_loss_gradients)
             callbacks.append(
                 LossGradientHistory(
-                    self.model, x_true, y_star, sample_weights,
+                    self.model, data_generator=data_generator,
                     **log_loss_gradients
                 )
             )
@@ -701,15 +514,14 @@ class SciModel(object):
                 log_loss_landscape = LossLandscapeHistory.prepare_inputs(log_loss_landscape)
             callbacks.append(
                 LossLandscapeHistory(
-                    self.model, x_true, y_star, sample_weights,
+                    self.model, data_generator=data_generator,
                     **log_loss_landscape
                 )
             )
         # training the models.
         history = opt_fit_func(
-            data_generator,
+            data_generator,  # sums to number of samples.
             epochs=epochs,
-            shuffle=shuffle,
             callbacks=callbacks,
             validation_data=validation_data,
             **kwargs
@@ -723,6 +535,223 @@ class SciModel(object):
 
         # return the history.
         return history
+
+
+    # def train_generator(self,
+    #                     data_generator,
+    #                     weights=None,
+    #                     target_weights=None,
+    #                     batch_size=2**6,
+    #                     epochs=100,
+    #                     learning_rate=0.001,
+    #                     adaptive_weights=None,
+    #                     log_loss_gradients=None,
+    #                     shuffle=True,
+    #                     callbacks=None,
+    #                     stop_lr_value=1e-8,
+    #                     reduce_lr_after=None,
+    #                     reduce_lr_min_delta=0.,
+    #                     stop_after=None,
+    #                     stop_loss_value=1e-8,
+    #                     log_parameters=None,
+    #                     log_functionals=None,
+    #                     log_loss_landscape=None,
+    #                     save_weights_to=None,
+    #                     save_weights_freq=0,
+    #                     default_zero_weight=0.0,
+    #                     validation_data=None,
+    #                     **kwargs):
+    #     """Performs the training on the model.
+
+    #     # Arguments
+    #         data_generator: Object of type keras.utils.Sequence.
+    #         target_weights: (list) A weight for each target defined in `y_true`.
+    #         epochs: (Integer) Number of epochs to train the model.
+    #             Defaulted to 100.
+    #             An epoch is an iteration over the entire `x` and `y`
+    #             data provided.
+    #         learning_rate: (Tuple/List) (epochs, lrs).
+    #             Expects a list/tuple with a list of epochs and a list or learning rates.
+    #             It linearly interpolates between entries.
+    #             Defaulted to 0.001 with no decay.
+    #             Example:
+    #                 learning_rate = ([0, 100, 1000], [0.001, 0.0005, 0.00001])
+    #         adaptive_weights: Pass a Dict with the following keys:
+    #             . freq: Freq to update the weights.
+    #             . log_freq: Freq to log the weights and gradients in the history object.
+    #             . beta: The beta parameter in from Gradient Pathology paper.
+    #         log_loss_gradients: Pass a Dict with the following keys:
+    #             . freq: Freq of logs. Defaulted to 100.
+    #             . path: Path to log the gradients.
+    #         callbacks: List of `keras.callbacks.Callback` instances.
+    #         reduce_lr_after: patience to reduce learning rate or stop after certain missed epochs.
+    #             Defaulted to epochs max(10, epochs/10).
+    #         stop_lr_value: stop the training if learning rate goes lower than this value.
+    #             Defaulted to 1e-8.
+    #         reduce_lr_min_delta: min absolute change in total loss value that is considered a successful change.
+    #             Defaulted to 0.001.
+    #             This values affects number of failed attempts to trigger reduce learning rate based on reduce_lr_after.
+    #         stop_after: To stop after certain missed epochs. Defaulted to total number of epochs.
+    #         stop_loss_value: The minimum value of the total loss that stops the training automatically.
+    #             Defaulted to 1e-8.
+    #         log_parameters: Dict object expecting the following keys:
+    #             . parameters: pass list of parameters.
+    #             . freq: pass freq of outputs.
+    #         log_functionals: Dict object expecting the following keys:
+    #             . functionals: List of functionals to log their training history.
+    #             . inputs: The input grid to evaluate the value of each functional.
+    #                       Should be of the same size as the inputs to the model.train.
+    #             . path: Path to the location that the csv files will be logged.
+    #             . freq: Freq of logging the functionals.
+    #         log_loss_landscape: Dict object expecting the following arguments:
+    #             . norm: defaulted to 2.
+    #             . resolution: defaulted to 10.
+    #             . path: Path to the location that the csv files will be logged.
+    #             . freq: Freq of logging the loss landscape.
+    #         save_weights_to: (file_path) If you want to save the state of the model (at the end of the training).
+    #         save_weights_freq: (Integer) Save weights every N epcohs.
+    #             Defaulted to 0.
+    #         default_zero_weight: a small number for zero sample-weight.
+
+    #     # Returns
+    #         A Keras 'History' object after performing fitting.
+    #     """
+    #     assert isinstance(data_generator, Sequence)
+    #     x_true, y_star, sample_weights = data_generator.get_data()
+    #     if callbacks is None:
+    #         # default_lr = learning_rate/0.9900
+    #         # f0 = np.log(1.0/0.9900 - 1.0)
+    #         # f1 = np.log(1.0/decay_max - 1.0)
+    #         # decay_epochs = epochs if decay_epochs is None else decay_epochs
+    #         # a0 = decay_epochs / (f1-f0)
+    #         # n0 = -a0*f0
+    #         if reduce_lr_after is None:
+    #             reduce_lr_after = max([10, epochs/10])
+    #         if stop_after is None:
+    #             stop_after = epochs
+    #         callbacks = []
+    #         if isinstance(learning_rate, (type(None), float, int)):
+    #             lr_rates = 0.001 if learning_rate is None else learning_rate
+    #             K.set_value(self.model.optimizer.lr, lr_rates)
+    #             callbacks.append(
+    #                 k.callbacks.ReduceLROnPlateau(
+    #                     monitor='loss', factor=0.5,
+    #                     patience=reduce_lr_after, #cooldown=epochs/10,
+    #                     verbose=1, mode='auto',
+    #                     min_delta=reduce_lr_min_delta,
+    #                     min_lr=0.
+    #                 )
+    #             )
+    #         elif isinstance(learning_rate, (tuple, list)):
+    #             lr_epochs = learning_rate[0]
+    #             lr_rates = learning_rate[1]
+    #             callbacks.append(
+    #                 # k.callbacks.LearningRateScheduler(lambda n: default_lr/(1.0 + np.exp((n-n0)/a0))),
+    #                 k.callbacks.LearningRateScheduler(lambda n: np.interp(n, lr_epochs, lr_rates))
+    #             )
+    #         else:
+    #             raise ValueError(
+    #                 "learning rate: expecting a `float` or a tuple/list of two arrays"
+    #                 " with `epochs` and `learning rates`"
+    #             )
+    #         callbacks += [
+    #             k.callbacks.EarlyStopping(monitor="loss", mode='auto', verbose=1,
+    #                                       patience=stop_after, min_delta=1e-9),
+    #             k.callbacks.TerminateOnNaN(),
+    #             EarlyStoppingByLossVal(stop_loss_value),
+    #             EarlyStoppingByLearningRate(stop_lr_value),
+    #         ]
+    #     len_inputs = self._model
+    #     if target_weights is not None:
+    #         if not(isinstance(target_weights, list) and
+    #                len(target_weights) == len(y_star)):
+    #             raise ValueError(
+    #                 'Expected a list of weights for the same size as the targets '
+    #                 '- was provided {}'.format(target_weights)
+    #             )
+    #     else:
+    #         target_weights = len(y_star) * [1.0]
+
+    #     # save model.
+    #     model_file_path = None
+    #     if save_weights_to is not None:
+    #         try:
+    #             self._model.save_weights("{}-start.hdf5".format(save_weights_to))
+    #             model_file_path = save_weights_to + "-{epoch:05d}-{loss:.3e}.hdf5"
+    #             model_check_point = k.callbacks.ModelCheckpoint(
+    #                 model_file_path, monitor='loss', save_weights_only=True, mode='auto',
+    #                 period=10 if save_weights_freq==0 else save_weights_freq,
+    #                 save_best_only=True if save_weights_freq==0 else False
+    #             )
+    #         except:
+    #             print("\nWARNING: Failed to save model.weights to the provided path: {}\n".format(save_weights_to))
+    #     if model_file_path is not None:
+    #         callbacks.append(model_check_point)
+
+    #     if isinstance(self._model.optimizer, GradientObserver):
+    #         raise ValueError
+    #     else:
+    #         opt_fit_func = self._model.fit
+
+    #     if adaptive_weights:
+    #         if not isinstance(adaptive_weights, dict):
+    #             adaptive_weights = NTKLossWeight.prepare_inputs(adaptive_weights)
+    #         callbacks.append(
+    #             NTKLossWeight(
+    #                 self.model, data_generator=data_generator,
+    #                 types=[type(v).__name__ for v in self.constraints],
+    #                 **adaptive_weights
+    #             ),
+    #         )
+
+    #     if log_loss_gradients:
+    #         if not isinstance(log_loss_gradients, dict):
+    #             log_loss_gradients = LossGradientHistory.prepare_inputs(log_loss_gradients)
+    #         callbacks.append(
+    #             LossGradientHistory(
+    #                 self.model, x_true, y_star, sample_weights,
+    #                 **log_loss_gradients
+    #             )
+    #         )
+    #     if log_parameters:
+    #         if not isinstance(log_parameters, dict):
+    #             log_parameters = ParameterHistory.prepare_inputs(log_parameters)
+    #         callbacks.append(
+    #             ParameterHistory(**log_parameters)
+    #         )
+    #     if log_functionals:
+    #         if not isinstance(log_functionals, dict):
+    #             log_functionals = FunctionalHistory.prepare_inputs(log_functionals)
+    #         callbacks.append(
+    #             FunctionalHistory(**log_functionals)
+    #         )
+    #     if log_loss_landscape:
+    #         if not isinstance(log_loss_landscape, dict):
+    #             log_loss_landscape = LossLandscapeHistory.prepare_inputs(log_loss_landscape)
+    #         callbacks.append(
+    #             LossLandscapeHistory(
+    #                 self.model, x_true, y_star, sample_weights,
+    #                 **log_loss_landscape
+    #             )
+    #         )
+    #     # training the models.
+    #     history = opt_fit_func(
+    #         data_generator,
+    #         epochs=epochs,
+    #         shuffle=shuffle,
+    #         callbacks=callbacks,
+    #         validation_data=validation_data,
+    #         **kwargs
+    #     )
+
+    #     if save_weights_to is not None:
+    #         try:
+    #             self._model.save_weights("{}-end.hdf5".format(save_weights_to))
+    #         except:
+    #             print("\nWARNING: Failed to save model.weights to the provided path: {}\n".format(save_weights_to))
+
+    #     # return the history.
+    #     return history
 
     def predict(self, xs,
                 batch_size=None,

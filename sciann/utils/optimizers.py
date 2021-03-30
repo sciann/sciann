@@ -126,6 +126,9 @@ class GeneratorWrapper(keras.utils.Sequence):
         sample_weights = [v[ids] for v in self._sample_weights]
         return inputs, outputs, sample_weights
 
+    def get_data(self):
+        return self._inputs, self._outputs, self._sample_weights
+
 
 class ScipyOptimizer(object):
     """
@@ -279,8 +282,8 @@ class ScipyOptimizer(object):
 
         # callbacks.on_test_end()
 
-    def fit(self, inputs, outputs, sample_weight, batch_size=32, shuffle=True, **kwargs):
-        return self.fit_generator(GeneratorWrapper(inputs, outputs, sample_weight, batch_size, shuffle), **kwargs)
+    def fit(self, data_generator, **kwargs):
+        return self.fit_generator(data_generator, **kwargs)
 
     def fit_generator(self, generator, epochs=1,
                       validation_data=None,
