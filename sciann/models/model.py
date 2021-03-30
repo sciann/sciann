@@ -314,8 +314,8 @@ class SciModel(object):
             data_generator = x_true
 
         else:
-            if None in (x_true, y_true):
-                raise ValueError
+            if y_true is None:
+                raise ValueError('(X_true, Y_true): Please provide proper values for both inputs and targets of SciModel. ')
             # prepare X,Y data.
             x_true = to_list(x_true)
             for i, (x, xt) in enumerate(zip(x_true, self._model.inputs)):
@@ -368,7 +368,7 @@ class SciModel(object):
 
             # create Sequence wrapper for training. 
             data_generator = GeneratorWrapper(
-                x_true, y_true, sample_weights, 
+                x_true, y_star, sample_weights, 
                 batch_size, shuffle
             )
 
