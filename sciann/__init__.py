@@ -51,7 +51,7 @@ _footer = len(_header)*'-'
 __welcome__ = \
     '{} \n'.format(_header) +\
     'For details, check out our review paper and the documentation at: \n' +\
-    ' +  "https://www.sciencedirect.com/science/article/pii/S0045782520307374", \n'
+    ' +  "https://www.sciencedirect.com/science/article/pii/S0045782520307374", \n' +\
     ' +  "https://arxiv.org/abs/2005.08803", \n' +\
     ' +  "https://www.sciann.com". \n' +\
     '\n ' +\
