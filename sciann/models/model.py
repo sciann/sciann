@@ -157,6 +157,8 @@ class SciModel(object):
         self._inputs = inputs
         self._constraints = targets
         self._loss_func = loss_func
+        self._optimizer = optimizer
+        self._loss_weights = loss_weights
         # Plot to file if requested.
         if plot_to_file is not None:
             plot_model(self._model, to_file=plot_to_file)
@@ -172,6 +174,11 @@ class SciModel(object):
     @property
     def inputs(self):
         return self._inputs
+
+    def compile(self):
+        self._model.compile(loss=self._loss_func,
+                            optimizer=self._optimizer,
+                            loss_weights=self._loss_weights)
 
     def load_weights(self, file):
         if os.path.exists(file):

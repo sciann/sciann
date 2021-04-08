@@ -16,6 +16,7 @@ from tensorflow import sin as tf_sin
 from tensorflow import cos as tf_cos
 from tensorflow import tile as tf_tile
 from tensorflow import pow as tf_pow
+from tensorflow import divide as tf_divide
 
 from tensorflow import gradients as tf_gradients
 from tensorflow import stop_gradient as tf_stop_gradient
@@ -34,7 +35,7 @@ def fourier(f, w=10):
     # Returns
         A Functional.
     """
-    validate_variable(f)
+    validate_functional(f)
     append_to_bib("wang2020eigenvector")
     layers = []
     outputs = []
@@ -83,27 +84,32 @@ def fourier(f, w=10):
     return res
 
 
-def monomial(f, p=10):
+def monomial(f, p=10, w=1.):
     """Apply monomial feature transformation to the `Variable` objects..
 
     # Arguments
-        p: (Int, list) monial powers to be considered.
+        p: (Int, list) monomial powers to be considered.
+        w: (Int, list) weights for each term in the monomial(e.g. 1/n! for taylor expansion).
 
     # Returns
         A Functional.
     """
-    validate_variable(f)
+    validate_functional(f)
     if isinstance(p, int):
         p = list(range(1, p+1))
     else:
-        assert isinstance(p, list)
+        assert isinstance(p, (np.ndarray, list))
+    if isinstance(w, float):
+        w = len(p)*[w]
+    else:
+        assert isinstance(w, (np.ndarray, list))
     layers = []
     outputs = []
     for fi in f.outputs:
         f_dim = fi.shape.as_list()
         tile_dim = (len(f_dim)-1)*[1] + [len(p)]
         layers.append(
-            Lambda(lambda ys: tf_pow(tf_tile(ys, tile_dim), p),
+            Lambda(lambda ys: tf_divide(tf_pow(tf_tile(ys, tile_dim), p), w),
                    name=graph_unique_name("monomials"))
         )
         outputs.append(
@@ -822,25 +828,35 @@ def mean(x, **kwargs):
     return _apply_function(x, 'mean', **kwargs)
 
 
-def equal(f, other):
+def equal(f, other, tol=None):
     """Element-wise comparison applied to the `Functional` objects.
 
     # Arguments
         f: Functional object.
         other: A python number or a tensor or a functional object.
+        tol: (float) If you need a tolerance measure.
 
     # Returns
         A Functional.
     """
     validate_functional(f)
+    assert isinstance(tol, (type(None), float)), 'Expected a floating value for `tol`.'
 
     inputs = f.inputs.copy()
     if is_functional(other):
         inputs += to_list(other.inputs)
-        lmbd = [Lambda(lambda x: K.cast_to_floatx(K.equal(x[0], x[1])), name=graph_unique_name("equal")) for X in f.outputs]
+        if tol is None:
+            lambda_opr = lambda x: K.cast_to_floatx(K.equal(x[0], x[1]))
+        else:
+            lambda_opr = lambda x: K.cast_to_floatx(K.less_equal(K.abs(x[0]-x[1]), tol))
     else:
         _warn_for_ndarray(other)
-        lmbd = [Lambda(lambda x: K.cast_to_floatx(K.equal(x, other)), name=graph_unique_name("equal")) for X in f.outputs]
+        if tol is None:
+            lambda_opr = lambda x: K.cast_to_floatx(K.equal(x, other))
+        else:
+            lambda_opr = lambda x: K.cast_to_floatx(K.less_equal(K.abs(x-other), tol))
+
+    lmbd = [Lambda(lambda_opr, name=graph_unique_name("equal")) for X in f.outputs]
 
     Functional = f.get_class()
     res = Functional(
@@ -851,58 +867,35 @@ def equal(f, other):
     return res
 
 
-def not_equal(f, other):
+def not_equal(f, other, tol=None):
     """Element-wise comparison applied to the `Functional` objects.
 
     # Arguments
         f: Functional object.
         other: A python number or a tensor or a functional object.
+        tol: (float) If you need a tolerance measure.
 
     # Returns
         A Functional.
     """
     validate_functional(f)
+    assert isinstance(tol, (type(None), float)), 'Expected a floating value for `tol`.'
 
     inputs = f.inputs.copy()
     if is_functional(other):
         inputs += to_list(other.inputs)
-        lmbd = [Lambda(lambda x: K.cast_to_floatx(K.not_equal(x[0], x[1])), name=graph_unique_name("not_equal")) for X in f.outputs]
+        if tol is None:
+            lambda_opr = lambda x: K.cast_to_floatx(K.not_equal(x[0], x[1]))
+        else:
+            lambda_opr = lambda x: K.cast_to_floatx(K.greater(K.abs(x[0] - x[1]), tol))
     else:
         _warn_for_ndarray(other)
-        lmbd = [Lambda(lambda x: K.cast_to_floatx(K.not_equal(x, other)), name=graph_unique_name("not_equal")) for X in f.outputs]
+        if tol is None:
+            lambda_opr = lambda x: K.cast_to_floatx(K.not_equal(x, other))
+        else:
+            lambda_opr = lambda x: K.cast_to_floatx(K.greater(K.abs(x - other), tol))
 
-    Functional = f.get_class()
-    res = Functional(
-        inputs=unique_tensors(inputs),
-        outputs=_apply_operation(lmbd, f, other),
-        layers=lmbd
-    )
-    return res
-
-
-def tol_equal(f, other, tol=1e-8):
-    """Element-wise comparison applied to the `Functional` objects.
-
-    # Arguments
-        f: Functional object.
-        other: A python number or a tensor or a functional object.
-        tol: float - defaulted to 1e-8.
-
-    # Returns
-        A Functional.
-    """
-    validate_functional(f)
-    assert isinstance(tol, float), "Expected a float for tolerance. "
-
-    inputs = f.inputs.copy()
-    if is_functional(other):
-        inputs += to_list(other.inputs)
-        lmbd = [Lambda(lambda x: K.cast_to_floatx(K.less_equal(K.abs(x[0]-x[1]), tol)),
-                       name=graph_unique_name("tol_equal")) for X in f.outputs]
-    else:
-        _warn_for_ndarray(other)
-        lmbd = [Lambda(lambda x: K.cast_to_floatx(K.less_equal(K.abs(x-other), tol)),
-                       name=graph_unique_name("tol_equal")) for X in f.outputs]
+    lmbd = [Lambda(lambda_opr, name=graph_unique_name("not_equal")) for X in f.outputs]
 
     Functional = f.get_class()
     res = Functional(
@@ -940,6 +933,10 @@ def greater(f, other):
         layers=lmbd
     )
     return res
+
+
+# legacy support
+tol_equal = equal
 
 
 def greater_equal(f, other):

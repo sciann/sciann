@@ -34,7 +34,7 @@ __copyright__ = "Copyright 2019, Physics-Informed Deep Learning"
 __credits__ = []
 __url__ = "http://github.com/sciann/sciann]"
 __license__ = "MIT"
-__version__ = "0.6.1.1"
+__version__ = "0.6.1.2"
 __cite__ = \
     '@article{haghighat2021sciann, \n' +\
     '    title={SciANN: A Keras/TensorFlow wrapper for scientific computations and physics-informed deep learning using artificial neural networks}, \n' +\
@@ -51,6 +51,7 @@ _footer = len(_header)*'-'
 __welcome__ = \
     '{} \n'.format(_header) +\
     'For details, check out our review paper and the documentation at: \n' +\
+    ' +  "https://www.sciencedirect.com/science/article/pii/S0045782520307374", \n'
     ' +  "https://arxiv.org/abs/2005.08803", \n' +\
     ' +  "https://www.sciann.com". \n' +\
     '\n ' +\

@@ -16,7 +16,7 @@ import numpy as np
 from .utilities import unpack_singleton, to_list, get_log_path
 from .utilities import append_to_bib
 from .math import tf_gradients
-
+from time import time
 
 @keras_export('keras.callbacks.EarlyStoppingByLossVal')
 class EarlyStoppingByLossVal(Callback):
@@ -107,13 +107,16 @@ class GradientPathologyLossWeight(Callback):
             self.eval_loss_weights = self.eval_loss_weights_m2
 
     def on_train_begin(self, logs=None):
-        loss_gradients = self.eval_loss_gradients()
-        self.update_loss_weights(0, loss_gradients)
-        self.update_loss_gradients(0, loss_gradients)
+        self.update(0)
 
     def on_epoch_begin(self, epoch, logs=None):
-        if self.freq > 0 and (epoch + 1) % self.freq == 0:
-            self.on_train_begin()
+        if self.freq > 0 and (epoch+1) % self.freq == 0:
+            self.update(epoch)
+
+    def update(self, epoch):
+        loss_gradients = self.eval_loss_gradients()
+        self.update_loss_weights(epoch, loss_gradients)
+        self.update_loss_gradients(epoch, loss_gradients)
 
     def on_epoch_end(self, epoch, logs={}):
         # log gradient values
@@ -492,7 +495,7 @@ class LossLandscapeHistory(Callback):
         return kwargs
 
 
-#
+
 # @keras_export('keras.callbacks.NTKLossWeight')
 # class NTKLossWeight(Callback):
 #     """ Callback that evaluate the adaptive weights based on the Gradient Pathologies approach by Wang et al.
@@ -559,15 +562,14 @@ class LossLandscapeHistory(Callback):
 #         # eval new gradients
 #         num_samples = self.inputs[0].shape[0]
 #         updated_NTK = [np.zeros((num_samples,)) for lgi in self.loss_grads]
+#         start_time = time()
 #         for li, lgi in enumerate(self.loss_grads):
-#             aaa = lgi(self.inputs)
 #             for i in range(num_samples):
 #                 wi = self.weights[li][i]
-#                 # if wi == 0.: continue
+#                 if wi == 0.: continue
 #                 xi = [v[i:i + 1, :] for v in self.inputs]
 #                 updated_NTK[li][i] = lgi(xi)
-#             print(updated_NTK[li])
-#             print('ehsan')
+#         print(time() - start_time)
 #         return updated_NTK
 #
 #     def eval_loss_weights(self, updated_grads):
@@ -656,14 +658,17 @@ class NTKLossWeight(Callback):
             x_values.append(tf.reshape(weights, (-1,)))
         return tf.concat(x_values, axis=0)
 
-    def on_train_begin(self, logs=None):
+    def update(self, epoch):
         loss_gradients = self.eval_diag_ntk()
-        self.update_loss_weights(0, loss_gradients)
-        self.update_loss_gradients(0, loss_gradients)
+        self.update_loss_weights(epoch, loss_gradients)
+        self.update_loss_gradients(epoch, loss_gradients)
+
+    def on_train_begin(self, logs=None):
+        self.update(0)
 
     def on_epoch_begin(self, epoch, logs=None):
         if self.freq > 0 and (epoch + 1) % self.freq == 0:
-            self.on_train_begin()
+            self.update(epoch)
 
     def on_epoch_end(self, epoch, logs={}):
         # log gradient values
@@ -696,6 +701,7 @@ class NTKLossWeight(Callback):
         # eval new gradients
         num_samples = self.inputs[0].shape[0]
         updated_NTK = [np.zeros((num_samples,)) for lgi in self.loss_grads]
+        # start_time = time()
         for li, lgi in enumerate(self.loss_grads):
             for i in range(num_samples):
                 wi = self.weights[li][i]
@@ -704,6 +710,7 @@ class NTKLossWeight(Callback):
                 gi = np.concatenate([np.abs(wg).flatten() for wg in lgi(xi)])
                 gij = np.dot(gi, gi)
                 updated_NTK[li][i] = gij
+        # print(time() - start_time)
         return updated_NTK
 
     def eval_loss_weights(self, updated_grads):
@@ -722,12 +729,13 @@ class NTKLossWeight(Callback):
 
     def update_loss_weights(self, epoch, updated_grads):
         new_weights = self.eval_loss_weights(updated_grads)
+        norm = sum(new_weights)
         self.loss_weights = []
         # evaluate new weights
         for i, wi in enumerate(self.model.loss_weights):
             # gp_weight = new_weights[i] / K.get_value(wi)
             # new_val = (1.0 - self.beta) * K.get_value(wi) + self.beta * gp_weight
-            new_val = new_weights[i]
+            new_val = new_weights[i]/norm
             K.set_value(self.model.loss_weights[i], new_val)
             self.loss_weights.append(new_val)
         # print updates
@@ -784,14 +792,17 @@ class NTKSampleWeight(Callback):
             x_values.append(tf.reshape(weights, (-1,)))
         return tf.concat(x_values, axis=0)
 
-    def on_train_begin(self, logs=None):
+    def update(self, epoch):
         loss_gradients = self.eval_diag_ntk()
-        self.update_loss_weights(0, loss_gradients)
-        self.update_loss_gradients(0, loss_gradients)
+        self.update_loss_weights(epoch, loss_gradients)
+        self.update_loss_gradients(epoch, loss_gradients)
+
+    def on_train_begin(self, logs=None):
+        self.update(0)
 
     def on_epoch_begin(self, epoch, logs=None):
         if self.freq > 0 and (epoch + 1) % self.freq == 0:
-            self.on_train_begin()
+            self.update(epoch)
 
     def on_epoch_end(self, epoch, logs={}):
         pass

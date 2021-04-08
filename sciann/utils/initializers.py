@@ -29,6 +29,12 @@ class SciKernelInitializer(k.initializers.VarianceScaling):
             scale = 1.0
             distribution = 'truncated_normal'
             mode = 'fan_avg'
+        #
+        # # based on Wang Yang's work
+        # if lay==0:
+        #     self.w0 = lambda x: k.sqrt(x.shape[-1])
+        # else:
+        #     self.w0 = lambda x: 1./k.sqrt(x.shape[-1])
 
         super(SciKernelInitializer, self).__init__(
             scale=scale,

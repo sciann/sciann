@@ -255,7 +255,7 @@ class MLPFunctional(object):
             
         # Returns 
         """
-        print("Warning: Call 'SciModel' after using set_trainable")
+        print("Warning: Call `model.compile()` after using set_trainable.")
         if isinstance(val, bool):
             if layers is None:
                 for l in self._layers:
