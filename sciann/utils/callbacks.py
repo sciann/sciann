@@ -18,6 +18,22 @@ from .utilities import append_to_bib
 from .math import tf_gradients
 from time import time
 
+
+@keras_export('keras.callbacks.EpochTime')
+class EpochTime(Callback):
+    """ Callback that records the training time.
+    """
+    def on_train_begin(self, logs={}):
+        self.times = []
+
+    def on_epoch_begin(self, batch, logs={}):
+        self.epoch_time_start = time()
+
+    def on_epoch_end(self, batch, logs={}):
+        self.times.append(time() - self.epoch_time_start)
+        logs['time'] = self.times[-1]
+
+
 @keras_export('keras.callbacks.EarlyStoppingByLossVal')
 class EarlyStoppingByLossVal(Callback):
     """ Callback that terminates the training when loss reaches a small values.
