@@ -311,7 +311,9 @@ class ScipyOptimizer(object):
         min_options = {
             'maxiter': epochs,
             'maxfun': epochs*10,
-            'ftol': 1e-10,
+            'maxcor': 50,
+            'maxls': 50,
+            'ftol': np.finfo(float).eps,
             'gtol': 1e-10,
             'eps': 1e-8,
         }

@@ -77,7 +77,7 @@ class MLPFunctional(object):
         self.outputs = outputs
         self.layers = layers
 
-    def eval(self, *kwargs):
+    def eval(self, *args):
         """ Evaluates the functional object for a given input.
 
         # Arguments
@@ -97,18 +97,18 @@ class MLPFunctional(object):
             ValueError:
             TypeError:
         """
-        if len(kwargs) == 1:
+        if len(args) == 1:
             model = self.model
             # read data.
-            mesh = kwargs[0]
-        elif len(kwargs) == 2:
-            if validations.is_scimodel(kwargs[0]):
-                model = K.function(kwargs[0].model.inputs, self.outputs)
+            mesh = args[0]
+        elif len(args) == 2:
+            if validations.is_scimodel(args[0]):
+                model = K.function(args[0].model.inputs, self.outputs)
             else:
                 raise ValueError(
                     'Expected a SciModel object for the first arg. '
                 )
-            mesh = kwargs[1]
+            mesh = args[1]
         else:
             raise NotImplemented()
         x_pred = to_list(mesh.copy())

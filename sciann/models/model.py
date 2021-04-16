@@ -342,6 +342,11 @@ class SciModel(object):
                         )
                         assert False
 
+            y_true = to_list(y_true)
+            assert len(y_true)==len(self._constraints), \
+                'Miss-match between expected targets (constraints) defined in `SciModel` and ' \
+                'the provided `y_true`s - expecting the same number of data points. '
+
             num_sample = x_true[0].shape[0]
             assert all([x.shape[0]==num_sample for x in x_true[1:]]), \
                 'Inconsistent sample size among `Xs`. '
@@ -349,7 +354,7 @@ class SciModel(object):
 
             if weights is None:
                 weights = np.ones(num_sample)
-            else:
+            elif isinstance(weights, np.ndarray):
                 if len(weights.shape)!=1 or \
                         weights.shape[0] != num_sample:
                     try:
@@ -360,18 +365,14 @@ class SciModel(object):
                             'the same sample length as `Xs. '
                         )
 
-            y_true = to_list(y_true)
-            assert len(y_true)==len(self._constraints), \
-                'Miss-match between expected targets (constraints) defined in `SciModel` and ' \
-                'the provided `y_true`s - expecting the same number of data points. '
-
             sample_weights, y_star = [], []
             for i, yt in enumerate(y_true):
                 c = self._constraints[i]
                 # verify entry.
                 ys, wei = SciModel._prepare_data(
                     c.cond.outputs, to_list(yt),
-                    weights, num_sample, default_zero_weight
+                    weights if isinstance(weights, np.ndarray) else weights[i],
+                    num_sample, default_zero_weight
                 )
                 # add to the list.
                 y_star += ys
@@ -500,11 +501,9 @@ class SciModel(object):
 
 
         if adaptive_sample_weights:
-            if not isinstance(adaptive_sample_weights, dict):
-                adaptive_sample_weights = NTKSampleWeight.prepare_inputs(adaptive_sample_weights)
             # sample_weights = [K.variable(wi) for wi in sample_weights]
             callbacks.append(
-                AdaptiveSampleWeight(
+                AdaptiveSampleWeight2(
                     self.model, data_generator=data_generator,
                     types=[type(v).__name__ for v in self.constraints],
                     **adaptive_sample_weights

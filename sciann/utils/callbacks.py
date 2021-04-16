@@ -15,6 +15,7 @@ import numpy as np
 
 from .utilities import unpack_singleton, to_list, get_log_path
 from .utilities import append_to_bib
+from .utilities import SciFunction
 from .math import tf_gradients
 from time import time
 
@@ -745,7 +746,7 @@ class NTKLossWeight(Callback):
 
     def update_loss_weights(self, epoch, updated_grads):
         new_weights = self.eval_loss_weights(updated_grads)
-        norm = sum(new_weights)
+        norm = 1.0 #sum(new_weights)
         self.loss_weights = []
         # evaluate new weights
         for i, wi in enumerate(self.model.loss_weights):
@@ -891,7 +892,6 @@ class NTKSampleWeight(Callback):
         return kwargs
 
 
-
 @keras_export('keras.callbacks.AdaptiveSampleWeight')
 class AdaptiveSampleWeight(Callback):
     """ Callback that evaluate the adaptive weights based on the Gradient Pathologies approach by Wang et al.
@@ -901,7 +901,7 @@ class AdaptiveSampleWeight(Callback):
                  hessian=False, types=None, **kwargs):
         super(AdaptiveSampleWeight, self).__init__()
         # generate samples. 
-        inputs, targets, weights = data_generator.get_data()
+        inputs, targets, weights = data_generator.get_grid()
         # limit number of samples for performance concerns.
         self.inputs = inputs
         self.targets = targets
@@ -939,6 +939,47 @@ class AdaptiveSampleWeight(Callback):
     @staticmethod
     def prepare_inputs(*args, **kwargs):
         kwargs['method'] = 'NTK'
+        if len(args) == 1:
+            kwargs['freq'] = args[0]
+        elif len(args) > 0:
+            raise ValueError
+        return kwargs
+
+
+@keras_export('keras.callbacks.AdaptiveSampleWeight2')
+class AdaptiveSampleWeight2(Callback):
+    """ Callback that evaluate the adaptive weights based on the Gradient Pathologies approach by Wang et al.
+    """
+    def __init__(self, model, data_generator, loss=None,
+                 beta=0.1, freq=100, log_freq=None,
+                 hessian=False, types=None, **kwargs):
+        super(AdaptiveSampleWeight2, self).__init__()
+        # limit number of samples for performance concerns.
+        self.data_generator = data_generator
+        self.inputs = data_generator.get_grid()
+        # eval loss and gradients.
+        if loss is None:
+            self.loss = K.function(model.inputs, model.outputs[0])
+        else:
+            self.loss = K.function(model.inputs, loss.outputs)
+        self.freq = 0 if isinstance(freq, bool) else freq
+        self.beta = beta
+        if log_freq is None:
+            self.log_freq = self.freq
+        else:
+            self.log_freq = log_freq
+
+    def on_train_begin(self, logs=None):
+        pass
+
+    def on_epoch_begin(self, epoch, logs=None):
+        if (epoch + 1) % self.freq == 0:
+            loss = unpack_singleton(self.loss(self.inputs))
+            self.data_generator.set_sample_weights(loss)
+
+    @staticmethod
+    def prepare_inputs(*args, **kwargs):
+        kwargs['method'] = 'AdaptiveSampleWeight2'
         if len(args) == 1:
             kwargs['freq'] = args[0]
         elif len(args) > 0:
