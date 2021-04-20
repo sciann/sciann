@@ -15,7 +15,6 @@ import numpy as np
 
 from .utilities import unpack_singleton, to_list, get_log_path
 from .utilities import append_to_bib
-from .utilities import SciFunction
 from .math import tf_gradients
 from time import time
 
@@ -356,18 +355,24 @@ class FunctionalHistory(Callback):
     def on_epoch_end(self, epoch, logs={}):
         # log gradient values
         if epoch % self.freq == 0:
-            # log the weights in the history output.
             logs['parameter_epochs'] = epoch
-            for field in self.functionals:
-                if self.sci_model is None:
-                    field_value = field.eval(self.inputs)
-                else:
-                    field_value = field.eval(self.sci_model, self.inputs)
-                np.savetxt(
-                    self.path + "-{}-epoch{}.csv".format(field.name, epoch+1),
-                    field_value,
-                    delimiter=','
-                )
+            self.log_functionals(epoch+1)
+
+    def on_train_end(self, logs=None):
+        self.log_functionals('-end')
+
+    def log_functionals(self, epoch=None):
+        # log the weights in the history output.
+        for field in self.functionals:
+            if self.sci_model is None:
+                field_value = field.eval(self.inputs)
+            else:
+                field_value = field.eval(self.sci_model, self.inputs)
+            np.savetxt(
+                self.path + "-{}-epoch{}.csv".format(field.name, epoch),
+                field_value,
+                delimiter=','
+            )
 
     @staticmethod
     def prepare_inputs(*args, **kwargs):

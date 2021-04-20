@@ -28,6 +28,7 @@ from tensorflow.python.keras.regularizers import l1_l2
 from .initializers import SciKernelInitializer as KInitializer
 from .initializers import SciBiasInitializer as BInitializer
 from .activations import get_activation, SciActivation, SciActivationLayer
+from .validations import is_functional
 
 from pybtex.database.input import bibtex
 
@@ -258,3 +259,18 @@ def to_list(x, allow_tuple=False):
         return list(x)
     return [x]
 
+
+def rename(f, name):
+    """rename functional.
+
+    # Arguments
+        f: A functional object.
+        name: A unique (unused) string.
+
+    # Returns
+        updated f.
+    """
+    assert is_functional(f)
+    assert str(name)
+    f.layers[-1]._name = name
+    return f
