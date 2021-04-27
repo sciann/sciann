@@ -129,29 +129,10 @@ class SciModel(object):
             outputs=output_vars,
             **kwargs
         )
+
         # compile the model.
         loss_weights = [K.variable(1.0) for v in output_vars]
-        if isinstance(optimizer, str) and \
-                len(optimizer.lower().split("scipy-")) > 1:
-            model.compile(
-                loss=loss_func,
-                optimizer=GradientObserver(method=optimizer),
-                loss_weights=loss_weights
-            )
-        else:
-            model.compile(
-                loss=loss_func,
-                optimizer=optimizer,
-                loss_weights=loss_weights
-            )
-        # model.train_function = True
 
-        # set initial state of the model.
-        if load_weights_from is not None:
-            if os.path.exists(load_weights_from): 
-                model.load_weights(load_weights_from)
-            else:
-                raise Warning("File not found - load_weights_from: {}".format(load_weights_from))
         # Set the variables.
         self._model = model
         self._inputs = inputs
@@ -160,6 +141,17 @@ class SciModel(object):
         self._optimizer = optimizer
         self._loss_weights = loss_weights
         self._callbacks = {}
+        
+        # compile the model 
+        self.compile()
+        
+        # set initial state of the model.
+        if load_weights_from is not None:
+            if os.path.exists(load_weights_from): 
+                model.load_weights(load_weights_from)
+            else:
+                raise Warning("File not found - load_weights_from: {}".format(load_weights_from))
+
         # Plot to file if requested.
         if plot_to_file is not None:
             plot_model(self._model, to_file=plot_to_file)
@@ -177,9 +169,17 @@ class SciModel(object):
         return self._inputs
 
     def compile(self):
-        self._model.compile(loss=self._loss_func,
-                            optimizer=self._optimizer,
-                            loss_weights=self._loss_weights)
+        loss_func = self._loss_func 
+        loss_weights = self._loss_weights
+        optimizer = self._optimizer
+
+        if isinstance(optimizer, str) and \
+                len(optimizer.lower().split("scipy-")) > 1:
+            optimizer = GradientObserver(method=optimizer)
+
+        self._model.compile(loss=loss_func,
+                            optimizer=optimizer,
+                            loss_weights=loss_weights)
 
     def clear_callbacks(self):
         self._callbacks.clear()
@@ -474,7 +474,7 @@ class SciModel(object):
         if adaptive_weights:
             if not isinstance(adaptive_weights, dict):
                 adaptive_weights = NTKLossWeight.prepare_inputs(adaptive_weights)
-            if adaptive_weights["method"] == "GP":
+            if adaptive_weights["method"].upper() == "GP":
                 callbacks.append(
                     GradientPathologyLossWeight(
                         self.model, data_generator=data_generator, 
@@ -482,11 +482,25 @@ class SciModel(object):
                         **adaptive_weights
                     ),
                 )
-            elif adaptive_weights["method"] == "NTK":
+            elif adaptive_weights["method"].upper() == "NTK":
                 callbacks.append(
                     NTKLossWeight(
                         self.model, data_generator=data_generator, 
                         types=[type(v).__name__ for v in self.constraints],
+                        **adaptive_weights
+                    ),
+                )
+            elif adaptive_weights["method"].upper() == "MTL":
+                callbacks.append(
+                    MTLLossWeight(
+                        self.model, data_generator=data_generator,
+                        **adaptive_weights
+                    ),
+                )
+            elif adaptive_weights["method"].upper() == "SCORE":
+                callbacks.append(
+                    ScoreLossWeight(
+                        self.model, data_generator=data_generator,
                         **adaptive_weights
                     ),
                 )
@@ -498,7 +512,6 @@ class SciModel(object):
 
         elif 'adaptive_weights' in self._callbacks:
             callbacks.append(self._callbacks['adaptive_weights'])
-
 
         if adaptive_sample_weights:
             # sample_weights = [K.variable(wi) for wi in sample_weights]
@@ -610,7 +623,8 @@ class SciModel(object):
                 "Expected {} - provided {}".format(len(self._inputs), len(to_list(xs)))
             )
         # To have unified output for postprocessing - limitted support.
-        shape_default = xs[0].shape if all([x.shape==xs[0].shape for x in xs]) else None
+        shape_default = [x.shape for x in xs]
+        assert all([shape_default[0][0]==x[0] for x in shape_default[1:]])
         # prepare X,Y data.
         for i, (x, xt) in enumerate(zip(xs, self._model.inputs)):
             x_shape = tuple(xt.get_shape().as_list())
@@ -625,11 +639,14 @@ class SciModel(object):
                     )
                     assert False
 
-        y_pred = self._model.predict(xs, batch_size, verbose, steps)
+        y_pred = to_list(self._model.predict(xs, batch_size, verbose, steps))
 
-        if shape_default is not None:
+        # revert back to normal.
+        xs = unpack_singleton([x.reshape(sd) for x, sd in zip(xs, shape_default)])
+
+        if all([shape_default[0]==sd for sd in shape_default[1:]]):
             try:
-                y_pred = [y.reshape(shape_default) for y in y_pred]
+                y_pred = [y.reshape(shape_default[0]) for y in y_pred]
             except:
                 print("Input and output dimensions need re-adjustment for post-processing.")
 
@@ -652,10 +669,10 @@ class SciModel(object):
             if not isinstance(var_name, str):
                 raise ValueError("Value Error: Expected a LayerName as the input. ")
             x_data = to_list(args[1])
-            new_model = Model(self.inputs, self.get_layer(var_name).output)
+            new_model = K.function(self._model.inputs, self._model.get_layer(var_name).output)
             if not all([isinstance(xi, np.ndarray) for xi in x_data]):
                 raise ValueError("Please provide input data to the network. ")
-            return unpack_singleton(new_model.predict(x_data))
+            return unpack_singleton(new_model(x_data))
 
     def plot_model(self, *args, **kwargs):
         """ Keras plot_model functionality.

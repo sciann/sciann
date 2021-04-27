@@ -3,6 +3,7 @@ from __future__ import division
 from __future__ import print_function
 
 from ..utils import default_bias_initializer, default_kernel_initializer, default_constant_initializer
+from ..utils import prepare_default_activations_and_initializers
 from ..utils import default_regularizer
 from ..utils import floatx, set_floatx
 
@@ -29,6 +30,7 @@ class Field(Dense):
         bias_regularizer: Regularizer for the bias.
             To set l1 and l2 to custom values, pass [l1, l2] or {'l1':l1, 'l2':l2}.
         trainable: Boolean to activate parameters of the network.
+        use_bias: Boolean to add bias to the network.
         dtype: data-type of the network parameters, can be
             ('float16', 'float32', 'float64').
 
@@ -39,11 +41,12 @@ class Field(Dense):
                  name=None,
                  units=1,
                  activation=linear,
-                 kernel_initializer=default_kernel_initializer(),
-                 bias_initializer=default_bias_initializer(),
+                 kernel_initializer=None,
+                 bias_initializer=None,
                  kernel_regularizer=None,
                  bias_regularizer=None,
                  trainable=True,
+                 use_bias=True,
                  dtype=None):
         if not dtype:
             dtype = floatx()
@@ -52,14 +55,16 @@ class Field(Dense):
 
         assert isinstance(name, str), \
             "Please provide a string for field name. "
-        assert callable(activation), \
-            "Please provide a function handle for the activation. "
 
         # prepare initializers.
         if isinstance(kernel_initializer, (float, int)):
             kernel_initializer = default_constant_initializer(kernel_initializer)
         if isinstance(bias_initializer, (float, int)):
             bias_initializer = default_constant_initializer(bias_initializer)
+        if isinstance(kernel_initializer, type(None)) and isinstance(bias_initializer, type(None)):
+            activation, kernel_initializer, bias_initializer = [
+                a[0] for a in prepare_default_activations_and_initializers(activation)
+            ]
         # prepare regularizers.
         kernel_regularizer = default_regularizer(kernel_regularizer)
         bias_regularizer = default_regularizer(bias_regularizer)
@@ -71,8 +76,22 @@ class Field(Dense):
             bias_initializer=bias_initializer,
             kernel_regularizer=kernel_regularizer,
             bias_regularizer=bias_regularizer,
-            use_bias=True,
             trainable=trainable,
+            use_bias=use_bias,
             name=name,
             dtype=dtype,
         )
+
+    @staticmethod
+    def prepare_field_inputs(*args):
+        if len(args) == 1 and isinstance(args[0], str):
+            fld_name, fld_units = args[0], 1
+        elif len(args) == 2 and isinstance(args[0], str):
+            fld_name, fld_units = args[0], args[1]
+        elif len(args) == 2 and isinstance(args[1], str):
+            fld_name, fld_units = args[1], args[0]
+        else:
+            raise ValueError(
+                'Unrecognised inputs for output layer - please use sn.Field to custom define the outputs. '
+            )
+        return fld_name, fld_units

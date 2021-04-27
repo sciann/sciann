@@ -100,7 +100,7 @@ class MLPFunctional(object):
         if len(args) == 1:
             model = self.model
             # read data.
-            mesh = args[0]
+            xs = args[0]
         elif len(args) == 2:
             if validations.is_scimodel(args[0]):
                 model = K.function(args[0].model.inputs, self.outputs)
@@ -108,18 +108,20 @@ class MLPFunctional(object):
                 raise ValueError(
                     'Expected a SciModel object for the first arg. '
                 )
-            mesh = args[1]
+            xs = args[1]
         else:
             raise NotImplemented()
-        x_pred = to_list(mesh.copy())
+
         # To have unified output for postprocessing - limitted support.
-        shape_default = x_pred[0].shape if all([x.shape==x_pred[0].shape for x in x_pred]) else None
+        xs = to_list(xs)
+        shape_default = [x.shape for x in xs]
+        assert all([shape_default[0][0]==x[0] for x in shape_default[1:]])
         # prepare X,Y data.
-        for i, (x, xt) in enumerate(zip(x_pred, model.inputs)):
+        for i, (x, xt) in enumerate(zip(xs, model.inputs)):
             x_shape = tuple(xt.get_shape().as_list())
             if x.shape != x_shape:
                 try:
-                    x_pred[i] = x.reshape((-1,) + x_shape[1:])
+                    xs[i] = x.reshape((-1,) + x_shape[1:])
                 except:
                     print(
                         'Could not automatically convert the inputs to be ' 
@@ -128,16 +130,18 @@ class MLPFunctional(object):
                     )
                     assert False
 
-        y_pred = to_list(model(x_pred))
+        y_pred = to_list(model(xs))
 
-        if shape_default is not None:
+        # revert back to normal.
+        xs = unpack_singleton([x.reshape(sd) for x, sd in zip(xs, shape_default)])
+
+        if all([shape_default[0]==sd for sd in shape_default[1:]]):
             try:
-                y_pred = [y.reshape(shape_default) for y in y_pred]
+                y_pred = [y.reshape(shape_default[0]) for y in y_pred]
             except:
                 print("Input and output dimensions need re-adjustment for post-processing.")
 
         return unpack_singleton(y_pred)
-
 
     @property
     def layers(self):

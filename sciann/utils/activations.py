@@ -56,6 +56,7 @@ class SciActivationLayer(k.layers.Layer):
         activation: name of activation function to use
             (see: [activations](../activations.md)),
             or alternatively, a TensorFlow operation.
+        type: ('l', 'g') for locally or globally activation functions.
 
     # Input shape
         Arbitrary. Use the keyword argument `input_shape`
@@ -66,13 +67,15 @@ class SciActivationLayer(k.layers.Layer):
         Same shape as input.
     """
 
-    def __init__(self, alpha=1.0, activation='linear', **kwargs):
+    def __init__(self, alpha=1.0, activation='linear', type='l', **kwargs):
         super(SciActivationLayer, self).__init__(**kwargs)
         self.activation = get_activation(activation)
         self.alpha_initializer = default_constant_initializer(alpha)
         self.alpha_regularizer = None
         self.alpha_constraint = None
         self.shared_axes = None
+        assert type in ('l', 'g')
+        self.type = type
 
     @tf_utils.shape_type_conversion
     def build(self, input_shape):
@@ -81,7 +84,7 @@ class SciActivationLayer(k.layers.Layer):
             for i in self.shared_axes:
                 param_shape[i - 1] = 1
         self.alpha = self.add_weight(
-            shape=param_shape,
+            shape=param_shape if self.type=='l' else [1,],
             name='alpha',
             initializer=self.alpha_initializer,
             regularizer=self.alpha_regularizer,

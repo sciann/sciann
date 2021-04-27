@@ -109,26 +109,31 @@ def Functional(
     kernel_regularizer = default_regularizer(kernel_regularizer)
     bias_regularizer = default_regularizer(bias_regularizer)
     # prepares fields.
-    fields = to_list(fields)
-    if all([isinstance(fld, str) for fld in fields]):
-        output_fields = [
-            Field(
-                name=fld,
-                kernel_initializer=kernel_initializer[-1],
-                bias_initializer=bias_initializer[-1],
-                kernel_regularizer=kernel_regularizer,
-                bias_regularizer=bias_regularizer,
-                trainable=trainable,
+    output_fields = []
+    for fld in to_list(fields):
+        if isinstance(fld, (str, tuple, list)):
+            if isinstance(fld, str):
+                fld_name, fld_units = Field.prepare_field_inputs(fld)
+            else:
+                fld_name, fld_units = Field.prepare_field_inputs(*fld)
+            output_fields.append(
+                Field(
+                    name=fld_name,
+                    units=fld_units,
+                    kernel_initializer=kernel_initializer[-1],
+                    bias_initializer=bias_initializer[-1],
+                    kernel_regularizer=kernel_regularizer,
+                    bias_regularizer=bias_regularizer,
+                    trainable=trainable,
+                )
             )
-            for fld in fields
-        ]
-    elif all([validations.is_field(fld) for fld in fields]):
-        output_fields = fields
-    else:
-        raise TypeError(
-            'Please provide a "list" of field names of'
-            + ' type "String" or "Field" objects.'
-        )
+        elif validations.is_field(fld):
+            output_fields.append(fields)
+        else:
+            raise TypeError(
+                'Please provide a "list" of field names of'
+                + ' type "String" or "Field" objects.'
+            )
     # prepare inputs/outputs/layers.
     inputs = []
     layers = []
@@ -168,7 +173,8 @@ def Functional(
                     kernel_regularizer=kernel_regularizer,
                     bias_regularizer=bias_regularizer,
                     trainable=trainable,
-                    name=graph_unique_name("DRes"+rl+"{:d}b".format(hidden_layers[0]))
+                    name=graph_unique_name("DRes"+rl+"{:d}b".format(hidden_layers[0])),
+                    **kwargs
                 )
             )
             res_output = layers[-1](net_input)
@@ -187,7 +193,8 @@ def Functional(
             kernel_regularizer=kernel_regularizer,
             bias_regularizer=bias_regularizer,
             trainable=trainable,
-            name=graph_unique_name("D{:d}b".format(nNeuron))
+            name=graph_unique_name("D{:d}b".format(nNeuron)),
+            **kwargs
         )
         layers.append(layer)
         net[-1] = layer(net[-1])

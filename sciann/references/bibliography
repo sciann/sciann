@@ -64,3 +64,19 @@
   url={https://royalsocietypublishing.org/doi/abs/10.1098/rspa.2020.0334}
 }
 
+@article{sener2018multi,
+  title={Multi-task learning as multi-objective optimization},
+  author={Sener, Ozan and Koltun, Vladlen},
+  journal={arXiv preprint arXiv:1810.04650},
+  year={2018}
+}
+
+@inproceedings{chen2018gradnorm,
+  title={Gradnorm: Gradient normalization for adaptive loss balancing in deep multitask networks},
+  author={Chen, Zhao and Badrinarayanan, Vijay and Lee, Chen-Yu and Rabinovich, Andrew},
+  booktitle={International Conference on Machine Learning},
+  pages={794--803},
+  year={2018},
+  organization={PMLR}
+}
+

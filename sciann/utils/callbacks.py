@@ -10,6 +10,7 @@ from tensorflow.python import keras as k
 from tensorflow.python.keras import backend as K
 from tensorflow.python.keras.callbacks import Callback
 from tensorflow.python.util.tf_export import keras_export
+from scipy.optimize import Bounds, LinearConstraint, minimize
 
 import numpy as np
 
@@ -75,9 +76,10 @@ class GradientPathologyLossWeight(Callback):
     """
     def __init__(self, model, data_generator,
                  beta=0.1, freq=100, log_freq=None,
-                 hessian=False, types=None, **kwargs):
+                 hessian=False, types=None, 
+                 use_score=False, alpha=0.5, **kwargs):
         super(GradientPathologyLossWeight, self).__init__()
-        append_to_bib("wang2020gp")
+        append_to_bib(["wang2020gp", "chen2018gradnorm"])
         # generate samples. 
         inputs, targets, weights = data_generator.get_data()
         # limit number of samples for performance concerns.
@@ -91,6 +93,7 @@ class GradientPathologyLossWeight(Callback):
             self.targets = targets
             self.weights = weights
         # eval loss and gradients.
+        self.losses = []
         self.loss_grads = []
         for i in range(len(model.outputs)):
             # fixed batch size
@@ -100,6 +103,7 @@ class GradientPathologyLossWeight(Callback):
             f = tf.reduce_mean(
                 model.loss_functions[i](ys, yp, sample_weight=ws)
             )
+            self.losses.append(K.function(model.inputs, f))
             gf = tf_gradients(f, model.trainable_weights, unconnected_gradients='zero')
             if hessian is True:
                 g2f = []
@@ -109,7 +113,7 @@ class GradientPathologyLossWeight(Callback):
                 self.loss_grads.append(g2f)
             else:
                 self.loss_grads.append([K.function(model.inputs, gf)])
-        self.freq = 0 if isinstance(freq, bool) else freq
+        self.freq = np.Inf if (freq==True or freq==0) else freq
         self.beta = beta
         assert len(self.targets) == len(types)
         self.types = types
@@ -121,17 +125,17 @@ class GradientPathologyLossWeight(Callback):
             self.eval_loss_weights = self.eval_loss_weights_m1
         else:
             self.eval_loss_weights = self.eval_loss_weights_m2
-
-    def on_train_begin(self, logs=None):
-        self.update(0)
+        self.alpha = alpha
+        self.base_losses = self.eval_losses() if use_score is True else None
 
     def on_epoch_begin(self, epoch, logs=None):
-        if self.freq > 0 and (epoch+1) % self.freq == 0:
+        if epoch % self.freq == 0:
             self.update(epoch)
 
     def update(self, epoch):
+        losses = self.eval_losses() if self.base_losses else None
         loss_gradients = self.eval_loss_gradients()
-        self.update_loss_weights(epoch, loss_gradients)
+        self.update_loss_weights(epoch, loss_gradients, losses)
         self.update_loss_gradients(epoch, loss_gradients)
 
     def on_epoch_end(self, epoch, logs={}):
@@ -139,6 +143,9 @@ class GradientPathologyLossWeight(Callback):
         logs['adaptive_weights'] = self.loss_weights
         # log norm2 of gradients
         logs['loss_gradients'] = self.loss_gradients
+    
+    def eval_losses(self):
+        return [l(self.inputs) for l in self.losses]
 
     def eval_loss_gradients(self):
         # eval new gradients
@@ -194,13 +201,25 @@ class GradientPathologyLossWeight(Callback):
             new_weights.append(normalization_grad / ref_grad_i)
         return new_weights
 
-    def update_loss_weights(self, epoch, updated_grads):
+    def update_loss_weights(self, epoch, updated_grads, updated_losses):
         new_weights = self.eval_loss_weights(updated_grads)
+        n_task = len(new_weights)
+        
+        if updated_losses:
+            new_scores = [li/l0 for li, l0 in zip(updated_losses, self.base_losses)]
+            new_scores = [(li/np.mean(new_scores))**self.alpha for li in new_scores]
+        else:
+            new_scores = n_task*[1.]
+
+        old_weights = [K.get_value(wi) for wi in self.model.loss_weights]
+        gp_weights = [new_weights[i]/old_weights[i]*new_scores[i] for i in range(n_task)]
+        norm = len(gp_weights)/sum(gp_weights)
+        gp_weights = [gpi*norm for gpi in gp_weights]
+
         self.loss_weights = []
         # evaluate new weights
-        for i, wi in enumerate(self.model.loss_weights):
-            gp_weight = new_weights[i] / K.get_value(wi)
-            new_val = (1.0 - self.beta) * K.get_value(wi) + self.beta * gp_weight
+        for i, wi in enumerate(old_weights):
+            new_val = (1.0 - self.beta) * wi + self.beta * gp_weights[i]
             K.set_value(self.model.loss_weights[i], new_val)
             self.loss_weights.append(new_val)
         # print updates
@@ -217,6 +236,7 @@ class GradientPathologyLossWeight(Callback):
         elif len(args) > 0:
             raise ValueError
         return kwargs
+
 
 
 @keras_export('keras.callbacks.LossGradientHistory')
@@ -257,7 +277,7 @@ class LossGradientHistory(Callback):
                     g2f.append(K.function(model.inputs, g2fi))
                 self.loss_hessians.append(g2f)
         self.path = get_log_path(path, 'loss-')
-        self.freq = 0 if isinstance(freq, bool) else freq
+        self.freq = np.Inf if (freq==True or freq==0) else freq
 
     def on_epoch_end(self, epoch, logs={}):
         loss_gradients = None
@@ -304,6 +324,326 @@ class LossGradientHistory(Callback):
             # append for each layer.
             updated_hessians.append(np.concatenate(loss_hessians))
         return updated_hessians
+
+    @staticmethod
+    def prepare_inputs(*args, **kwargs):
+        if len(args) == 1:
+            kwargs['freq'] = args[0]
+        elif len(args) > 0:
+            raise ValueError
+        return kwargs
+
+
+@keras_export('keras.callbacks.MTLLossWeight')
+class MTLLossWeight(Callback):
+    """ Callback that evaluate the gradient of loss terms.
+    """
+
+    def __init__(self, model, data_generator, freq=100, **kwargs):
+        super(MTLLossWeight, self).__init__()
+        append_to_bib("sener2018multi")
+        # generate samples.
+        inputs, targets, weights = data_generator.get_data()
+        # limit number of samples for performance concerns.
+        if inputs[0].shape[0] > 20000:
+            sample_ids = np.random.choice(inputs[0].shape[0], 20000, replace=False)
+            self.inputs = [x[sample_ids] for x in inputs]
+            self.targets = [y[sample_ids] for y in targets]
+            self.weights = [w[sample_ids] for w in weights]
+        else:
+            self.inputs = inputs
+            self.targets = targets
+            self.weights = weights
+        self.loss_grads = []
+        self.parameters = model.trainable_weights
+        for i in range(len(model.outputs)):
+            yp = model.outputs[i]
+            ys = self.targets[i]
+            ws = self.weights[i]
+            f = tf.reduce_mean(
+                model.loss_functions[i](ys, yp, sample_weight=ws)
+            )
+            gf = tf_gradients(f, self.parameters, unconnected_gradients='zero')
+            self.loss_grads.append(
+                K.function(model.inputs, gf)
+            )
+        self.freq = np.Inf if (freq==True or freq==0) else freq
+        self.hist_gradient = []
+        self.hist_parameters = []
+        self.loss_weights = len(model.outputs) * [1.]
+        self.loss_hessians = len(model.outputs) * [0.]
+
+    def on_epoch_begin(self, epoch, logs={}):
+        # pass
+        loss_gradients = None
+        if epoch % self.freq == 0:
+            grads = self.eval_loss_gradients()
+            num_Ts = len(grads)
+
+            M = np.array([[np.dot(gi, gj) for gj in grads] for gi in grads])
+            alpha0 = np.ones(num_Ts)
+
+            f = lambda x: 0.5*np.matmul(M, x).dot(x)
+            jac = lambda x: np.matmul(M, x)
+            hess = lambda x: M
+
+            bounds = Bounds(np.zeros(num_Ts), np.ones(num_Ts)*num_Ts)
+            constraint = LinearConstraint(np.ones(num_Ts), num_Ts, num_Ts)
+
+            alpha = minimize(
+                f, alpha0, method='trust-constr',
+                jac=jac, hess=hess, bounds=bounds, constraints=constraint
+            )
+
+            self.loss_weights = alpha.x
+            self.loss_gradients = [np.linalg.norm(hs) for hs in grads]
+
+            for i, wi in enumerate(self.model.loss_weights):
+                gp_weight = self.loss_weights[i]
+                new_val = gp_weight  # (1.0 - self.beta) * K.get_value(wi) + self.beta * gp_weight
+                K.set_value(self.model.loss_weights[i], new_val)
+
+            # print updates
+            print('\n+ adaptive_weights at epoch {}:'.format(epoch + 1), self.loss_weights)
+
+    def on_epoch_end(self, epoch, logs={}):
+        # log gradient values
+        logs['adaptive_weights'] = self.loss_weights
+        # log norm2 of gradients
+        logs['loss_gradients'] = self.loss_gradients
+
+    def eval_loss_gradients(self):
+        # eval new gradients
+        updated_grads = []
+        for lgi in self.loss_grads:
+            updated_grads.append(
+                np.concatenate(
+                    [wg.flatten() for wg in lgi(self.inputs)]
+                )
+            )
+        return updated_grads
+
+    def eval_parameters(self):
+        return np.concatenate([K.get_value(wi).flatten() for wi in self.parameters])
+
+    def eval_loss_hessians(self):
+        # eval new gradients
+        updated_hessians = []
+        for lhi in self.loss_hessians:
+            loss_hessians = []
+            for lhij in lhi:
+                wlhij = lhij(self.inputs)
+                loss_hessians.append(
+                    np.concatenate([wg.flatten() for wg in wlhij])
+                )
+            # append for each layer.
+            updated_hessians.append(np.concatenate(loss_hessians))
+        return updated_hessians
+
+    @staticmethod
+    def prepare_inputs(*args, **kwargs):
+        if len(args) == 1:
+            kwargs['freq'] = args[0]
+        elif len(args) > 0:
+            raise ValueError
+        return kwargs
+
+
+@keras_export('keras.callbacks.GradNormLossWeight')
+class GradNormLossWeight(Callback):
+    """ Callback that evaluate the gradient of loss terms.
+    """
+
+    def __init__(self, model, data_generator, freq=100, **kwargs):
+        super(GradNormLossWeight, self).__init__()
+        # generate samples.
+        inputs, targets, weights = data_generator.get_data()
+        # limit number of samples for performance concerns.
+        if inputs[0].shape[0] > 20000:
+            sample_ids = np.random.choice(inputs[0].shape[0], 20000, replace=False)
+            self.inputs = [x[sample_ids] for x in inputs]
+            self.targets = [y[sample_ids] for y in targets]
+            self.weights = [w[sample_ids] for w in weights]
+        else:
+            self.inputs = inputs
+            self.targets = targets
+            self.weights = weights
+        self.losses = []
+        self.loss_grads = []
+        self.parameters = model.trainable_weights
+        for i in range(len(model.outputs)):
+            yp = model.outputs[i]
+            ys = self.targets[i]
+            ws = self.weights[i]
+            f = tf.reduce_mean(
+                model.loss_functions[i](ys, yp, sample_weight=ws)
+            )
+            self.losses.append(
+                K.function(model.inputs, f)
+            )
+            gf = tf_gradients(f, self.parameters, unconnected_gradients='zero')
+            self.loss_grads.append(
+                K.function(model.inputs, gf)
+            )
+        self.freq = np.Inf if (freq==True or freq==0) else freq
+        self.hist_loss = []
+        self.hist_gradient = []
+        self.hist_parameters = []
+        self.loss_weights = len(model.outputs) * [1.]
+        self.loss_gradients = len(model.outputs) * [0.]
+
+    def on_train_begin(self, logs=None):
+        self.hist_loss.append(self.eval_losses())
+
+    def on_epoch_begin(self, epoch, logs={}):
+        # pass
+        loss_gradients = None
+        if epoch % self.freq == 0:
+            losses = self.eval_losses()
+            grads = self.eval_loss_gradients()
+            norm_grads = [np.linalg.norm(gi) for gi in grads]
+            num_Ts = len(losses)
+
+            # inital values of the weights
+            ws = [K.get_value(wi) for wi in self.model.loss_weights]
+            # weighted single task gradients
+            Gw = [wi*gi for gi, wi in zip(norm_grads, ws)]
+            Gw_ave = np.mean(Gw)
+            rGw = [gwi/Gw_ave for gwi in Gw]
+            # Scores
+            S = [lt/l0 for lt, l0 in zip(losses, self.hist_loss[0])]
+            S_ave = np.mean(S)
+            rS = [si/S_ave for si in S]
+
+            weights = [rsi/rgi for rsi, rgi in zip(rS, rGw)]
+            weights = [wi/sum(weights)*num_Ts for wi in weights]
+
+            beta = 0.9
+            self.loss_weights = [beta*w0 + (1-beta)*w1 for w0, w1 in zip(ws, weights)]
+
+            # alpha=0.0
+            # # find new ws
+            # f = lambda x: np.sum([abs(x[i]*norm_grads[i] - Gw_ave*r[i]**alpha)
+            #                       for i in range(num_Ts)])
+            # jac = lambda x: [norm_grads[i]/abs(x[i]*norm_grads[i] - Gw_ave*r[i]**alpha)
+            #                  for i in range(num_Ts)]
+            #
+            # bounds = Bounds(np.zeros(num_Ts), np.full(num_Ts, np.Inf))
+            # constraint = LinearConstraint(np.ones(num_Ts), num_Ts, num_Ts)
+            #
+            # weights = minimize(
+            #     f, ws, method='trust-constr',
+            #     jac=jac, bounds=bounds, constraints=constraint
+            # )
+            # self.loss_weights = weights.x
+
+            # print(jac(ws))
+            # weights = [wi-1e-2*jac_wi for wi, jac_wi in zip(ws,jac(ws))]
+            # self.loss_weights = [wi/sum(weights)*num_Ts for wi in weights]
+            self.loss_gradients = norm_grads
+
+            for i, wi in enumerate(self.model.loss_weights):
+                K.set_value(self.model.loss_weights[i], self.loss_weights[i])
+
+            # print updates
+            print('\n+ adaptive_weights at epoch {}: '.format(epoch + 1), self.loss_weights)
+
+    def on_epoch_end(self, epoch, logs={}):
+        # log gradient values
+        logs['adaptive_weights'] = self.loss_weights
+        # log norm2 of gradients
+        logs['loss_gradients'] = self.loss_gradients
+
+    def eval_loss_gradients(self):
+        # eval new gradients
+        updated_grads = []
+        for lgi in self.loss_grads:
+            updated_grads.append(
+                np.concatenate(
+                    [wg.flatten() for wg in lgi(self.inputs)]
+                )
+            )
+        return updated_grads
+
+    def eval_losses(self):
+        return [lgi(self.inputs) for lgi in self.losses]
+
+    def eval_parameters(self):
+        return np.concatenate([K.get_value(wi).flatten() for wi in self.parameters])
+
+    @staticmethod
+    def prepare_inputs(*args, **kwargs):
+        if len(args) == 1:
+            kwargs['freq'] = args[0]
+        elif len(args) > 0:
+            raise ValueError
+        return kwargs
+
+
+@keras_export('keras.callbacks.ScoreLossWeight')
+class ScoreLossWeight(Callback):
+    """ Callback that evaluate the gradient of loss terms.
+    """
+
+    def __init__(self, model, data_generator, freq=100, 
+                 alpha=1., beta=0.1, **kwargs):
+        super(ScoreLossWeight, self).__init__()
+        # generate samples.
+        inputs, targets, weights = data_generator.get_data()
+        # limit number of samples for performance concerns.
+        if inputs[0].shape[0] > 20000:
+            sample_ids = np.random.choice(inputs[0].shape[0], 20000, replace=False)
+            self.inputs = [x[sample_ids] for x in inputs]
+            self.targets = [y[sample_ids] for y in targets]
+            self.weights = [w[sample_ids] for w in weights]
+        else:
+            self.inputs = inputs
+            self.targets = targets
+            self.weights = weights
+        self.losses = []
+        for i in range(len(model.outputs)):
+            yp = model.outputs[i]
+            ys = self.targets[i]
+            ws = self.weights[i]
+            f = tf.reduce_mean(
+                model.loss_functions[i](ys, yp, sample_weight=ws)
+            )
+            self.losses.append(K.function(model.inputs, f))
+
+        self.freq = np.Inf if (freq==True or freq==0) else freq
+        self.alpha = alpha
+        self.beta = beta
+        self.base_losses = self.eval_losses()
+
+    def on_epoch_begin(self, epoch, logs={}):
+        # pass
+        if epoch % self.freq == 0:
+            losses = self.eval_losses()
+            n_task = len(losses)
+
+            scores = [li/l0 for li, l0 in zip(losses, self.base_losses)]
+            scores = [(li/np.mean(scores))**self.alpha for li in scores]
+            norm = n_task/sum(scores)
+            new_weights = [si*norm for si in scores]
+
+            old_weights = [K.get_value(wi) for wi in self.model.loss_weights]
+            
+            self.loss_weights = []
+            # evaluate new weights
+            for i, wi in enumerate(old_weights):
+                new_val = (1.0 - self.beta) * wi + self.beta * new_weights[i]
+                K.set_value(self.model.loss_weights[i], new_val)
+                self.loss_weights.append(new_val)
+
+            # print updates
+            print('\n+ adaptive_weights at epoch {}:'.format(epoch+1), self.loss_weights)
+
+    def on_epoch_end(self, epoch, logs={}):
+        # log gradient values
+        logs['adaptive_weights'] = self.loss_weights
+
+    def eval_loss_gradients(self):
+        return [l(self.inputs) for l in self.losses]
 
     @staticmethod
     def prepare_inputs(*args, **kwargs):
@@ -518,6 +858,160 @@ class LossLandscapeHistory(Callback):
 
 
 
+@keras_export('keras.callbacks.NTKLossWeight')
+class NTKLossWeight(Callback):
+    """ Callback that evaluate the adaptive weights based on the Gradient Pathologies approach by Wang et al.
+    """
+    def __init__(self, model, data_generator,
+                 beta=0.9, freq=100, log_freq=None,
+                 use_score=False, alpha=0.5, types=None, **kwargs):
+        super(NTKLossWeight, self).__init__()
+        append_to_bib("wang2020ntk")
+        # generate samples.
+        inputs, targets, weights = data_generator.get_data()
+        # limit number of samples for performance concerns.
+        MAX_SAMPLE = 10000
+        if inputs[0].shape[0] > MAX_SAMPLE:
+            sample_ids = np.random.choice(inputs[0].shape[0], MAX_SAMPLE, replace=False)
+            self.inputs = [x[sample_ids] for x in inputs]
+            self.targets = [y[sample_ids] for y in targets]
+            self.weights = [w[sample_ids] for w in weights]
+        else:
+            self.inputs = inputs
+            self.targets = targets
+            self.weights = weights
+        # eval loss and gradients.
+        self.losses, self.loss_grads = [], []
+        for i in range(len(model.outputs)):
+            # fixed batch size
+            yp = model.outputs[i]
+            ys = self.targets[i]
+            ws = self.weights[i]
+            # eval losses
+            if use_score is True:
+                f = tf.reduce_mean(
+                    model.loss_functions[i](ys, yp, sample_weight=ws)
+                )
+                self.losses.append(K.function(model.inputs, f))
+            # eval gradients
+            gf = tf_gradients(yp, model.trainable_weights, unconnected_gradients='zero')
+            gf_dot_gf = tf.add_n([tf.reduce_sum(tf.multiply(gf_i, gf_i)) for gf_i in gf])
+            self.loss_grads.append(K.function(model.inputs, gf_dot_gf))
+        self.freq = np.Inf if (freq==True or freq==0) else freq
+        self.beta = beta
+        self.types = types
+        if log_freq is None:
+            self.log_freq = self.freq
+        else:
+            self.log_freq = log_freq
+        assert len(model.outputs) == len(types)
+        self.alpha = alpha
+        self.base_losses = self.eval_losses() if use_score is True else None
+
+    @staticmethod
+    def collect_weights(model):
+        x_values = []
+        for weights in model.trainable_weights:
+            x_values.append(tf.reshape(weights, (-1,)))
+        return tf.concat(x_values, axis=0)
+
+    def on_epoch_begin(self, epoch, logs=None):
+        if epoch % self.freq == 0:
+            losses = None if self.base_losses is None else self.eval_losses()
+            loss_gradients = self.eval_diag_ntk()
+            self.update_loss_weights(0, loss_gradients, losses)
+            self.update_loss_gradients(0, loss_gradients)
+
+    def on_epoch_end(self, epoch, logs={}):
+        # log gradient values
+        logs['adaptive_weights'] = self.loss_weights
+        # log norm2 of gradients
+        logs['loss_gradients'] = self.loss_gradients
+
+    def eval_diag_ntk(self):
+        # eval new gradients
+        num_samples = self.inputs[0].shape[0]
+        updated_NTK = [np.zeros((num_samples,)) for lgi in self.loss_grads]
+        start_time = time()
+        for li, lgi in enumerate(self.loss_grads):
+            for i in range(num_samples):
+                wi = self.weights[li][i]
+                if wi == 0.: continue
+                xi = [v[i:i + 1, :] for v in self.inputs]
+                updated_NTK[li][i] = lgi(xi)
+        print(time() - start_time)
+        return updated_NTK
+
+    def eval_losses(self):
+        return [fi(self.inputs) for fi in self.losses]
+
+    def eval_loss_weights(self, updated_grads):
+        # Method 1: normalization by PDE.
+        # eval max normalization on PDE.
+        ref_grad = []
+        for ws in updated_grads:
+            ref_grad.append(ws.sum())
+        normalization_grad = sum(ref_grad)
+        # evaluate new weights
+        new_weights = []
+        for i, type in enumerate(self.types):
+            ref_grad_i = ref_grad[i] if ref_grad[i] != 0. else np.mean(ref_grad)
+            new_weights.append(normalization_grad / ref_grad_i)
+        return new_weights
+
+    def eval_scored_loss_weights(self, updated_grads, updated_losses):
+        # Method 1: normalization by PDE.
+        # eval max normalization on PDE.
+        ref_grad = []
+        for ws in updated_grads:
+            ref_grad.append(ws.sum())
+        normalization_grad = sum(ref_grad)
+        # eval scores
+        r_score = []
+        for li, l0 in zip(updated_losses, self.base_losses):
+            r_score.append(li/l0 if l0>0. else 0.)
+        normalization_r_score = np.mean(r_score)
+        # evaluate new weights
+        new_weights = []
+        for i, type in enumerate(self.types):
+            ref_grad_i = ref_grad[i] if ref_grad[i] != 0. else np.mean(ref_grad)
+            ref_score_i = (r_score[i]/normalization_r_score)**self.alpha
+            if ref_score_i==0.:
+                ref_score_i = 1.
+            new_weights.append(normalization_grad / ref_grad_i * ref_score_i)
+        return new_weights
+
+    def update_loss_weights(self, epoch, updated_grads, updated_losses):
+        if updated_losses is None:
+            new_weights = self.eval_loss_weights(updated_grads)
+        else:
+            new_weights = self.eval_scored_loss_weights(updated_grads, updated_losses)
+        # normalization
+        weight_normalization = len(new_weights) / sum(new_weights)
+        self.loss_weights = []
+        # evaluate new weights
+        for i, wi in enumerate(self.model.loss_weights):
+            new_val = (1-self.beta) * K.get_value(wi) \
+                    + self.beta * (new_weights[i] * weight_normalization)
+            K.set_value(self.model.loss_weights[i], new_val)
+            self.loss_weights.append(new_val)
+        # print updates
+        print('\n+ adaptive_weights at epoch {}:'.format(epoch+1), self.loss_weights)
+
+    def update_loss_gradients(self, epoch, updated_grads):
+        self.loss_gradients = [np.linalg.norm(lgi) for lgi in updated_grads]
+
+    @staticmethod
+    def prepare_inputs(*args, **kwargs):
+        kwargs['method'] = 'NTK'
+        if len(args) == 1:
+            kwargs['freq'] = args[0]
+        elif len(args) > 0:
+            raise ValueError
+        return kwargs
+
+
+#
 # @keras_export('keras.callbacks.NTKLossWeight')
 # class NTKLossWeight(Callback):
 #     """ Callback that evaluate the adaptive weights based on the Gradient Pathologies approach by Wang et al.
@@ -547,9 +1041,8 @@ class LossLandscapeHistory(Callback):
 #             yp = model.outputs[i]
 #             ws = self.weights[i]
 #             gf = tf_gradients(yp, model.trainable_weights, unconnected_gradients='zero')
-#             gf_dot_gf = tf.add_n([tf.reduce_sum(tf.multiply(gf_i, gf_i)) for gf_i in gf])
-#             self.loss_grads.append(K.function(model.inputs, gf_dot_gf))
-#         self.freq = 0 if isinstance(freq, bool) else freq
+#             self.loss_grads.append(K.function(model.inputs, gf))
+#         self.freq = np.Inf if (freq==True or freq==0) else freq
 #         self.beta = beta
 #         self.types = types
 #         if log_freq is None:
@@ -565,14 +1058,17 @@ class LossLandscapeHistory(Callback):
 #             x_values.append(tf.reshape(weights, (-1,)))
 #         return tf.concat(x_values, axis=0)
 #
-#     def on_train_begin(self, logs=None):
+#     def update(self, epoch):
 #         loss_gradients = self.eval_diag_ntk()
-#         self.update_loss_weights(0, loss_gradients)
-#         self.update_loss_gradients(0, loss_gradients)
+#         self.update_loss_weights(epoch, loss_gradients)
+#         self.update_loss_gradients(epoch, loss_gradients)
+#
+#     def on_train_begin(self, logs=None):
+#         self.update(0)
 #
 #     def on_epoch_begin(self, epoch, logs=None):
 #         if self.freq > 0 and (epoch + 1) % self.freq == 0:
-#             self.on_train_begin()
+#             self.update(epoch)
 #
 #     def on_epoch_end(self, epoch, logs={}):
 #         # log gradient values
@@ -580,18 +1076,41 @@ class LossLandscapeHistory(Callback):
 #         # log norm2 of gradients
 #         logs['loss_gradients'] = self.loss_gradients
 #
+#     def eval_full_ntk(self):
+#         # eval new gradients
+#         num_samples = self.inputs[0].shape[0]
+#         ntk = [
+#             [np.zeros((num_samples,num_samples)) for lgi in self.loss_grads]
+#             for lgj in self.loss_grads
+#         ]
+#         for i in range(num_samples):
+#             xi = [v[i:i+1, :] for v in self.inputs]
+#             for j in range(num_samples):
+#                 xj = [v[j:j+1, :] for v in self.inputs]
+#                 for li, lgi in enumerate(self.loss_grads):
+#                     if self.weights[li][i] == 0.: continue
+#                     gi = np.concatenate([np.abs(wg).flatten() for wg in lgi(xi)])
+#                     for lj, lgj in enumerate(self.loss_grads):
+#                         if self.weights[lj][j] == 0.: continue
+#                         gj = np.concatenate([np.abs(wg).flatten() for wg in lgj(xj)])
+#                         gij = np.dot(gi, gj)
+#                         ntk[li][lj][i, j] = gij
+#         return ntk
+#
 #     def eval_diag_ntk(self):
 #         # eval new gradients
 #         num_samples = self.inputs[0].shape[0]
 #         updated_NTK = [np.zeros((num_samples,)) for lgi in self.loss_grads]
-#         start_time = time()
+#         # start_time = time()
 #         for li, lgi in enumerate(self.loss_grads):
 #             for i in range(num_samples):
 #                 wi = self.weights[li][i]
 #                 if wi == 0.: continue
 #                 xi = [v[i:i + 1, :] for v in self.inputs]
-#                 updated_NTK[li][i] = lgi(xi)
-#         print(time() - start_time)
+#                 gi = np.concatenate([np.abs(wg).flatten() for wg in lgi(xi)])
+#                 gij = np.dot(gi, gi)
+#                 updated_NTK[li][i] = gij
+#         # print(time() - start_time)
 #         return updated_NTK
 #
 #     def eval_loss_weights(self, updated_grads):
@@ -610,12 +1129,13 @@ class LossLandscapeHistory(Callback):
 #
 #     def update_loss_weights(self, epoch, updated_grads):
 #         new_weights = self.eval_loss_weights(updated_grads)
+#         norm = 1.0 #sum(new_weights)
 #         self.loss_weights = []
 #         # evaluate new weights
 #         for i, wi in enumerate(self.model.loss_weights):
 #             # gp_weight = new_weights[i] / K.get_value(wi)
 #             # new_val = (1.0 - self.beta) * K.get_value(wi) + self.beta * gp_weight
-#             new_val = new_weights[i]
+#             new_val = new_weights[i]/norm
 #             K.set_value(self.model.loss_weights[i], new_val)
 #             self.loss_weights.append(new_val)
 #         # print updates
@@ -632,149 +1152,7 @@ class LossLandscapeHistory(Callback):
 #         elif len(args) > 0:
 #             raise ValueError
 #         return kwargs
-
-
-@keras_export('keras.callbacks.NTKLossWeight')
-class NTKLossWeight(Callback):
-    """ Callback that evaluate the adaptive weights based on the Gradient Pathologies approach by Wang et al.
-    """
-    def __init__(self, model, data_generator,
-                 beta=0.1, freq=100, log_freq=None,
-                 hessian=False, types=None, **kwargs):
-        super(NTKLossWeight, self).__init__()
-        append_to_bib("wang2020ntk")
-        # generate samples.
-        inputs, targets, weights = data_generator.get_data()
-        # limit number of samples for performance concerns.
-        MAX_SAMPLE = 10000
-        if inputs[0].shape[0] > MAX_SAMPLE:
-            sample_ids = np.random.choice(inputs[0].shape[0], MAX_SAMPLE, replace=False)
-            self.inputs = [x[sample_ids] for x in inputs]
-            self.targets = [y[sample_ids] for y in targets]
-            self.weights = [w[sample_ids] for w in weights]
-        else:
-            self.inputs = inputs
-            self.targets = targets
-            self.weights = weights
-        # eval loss and gradients.
-        self.loss_grads = []
-        for i in range(len(model.outputs)):
-            # fixed batch size
-            yp = model.outputs[i]
-            ws = self.weights[i]
-            gf = tf_gradients(yp, model.trainable_weights, unconnected_gradients='zero')
-            self.loss_grads.append(K.function(model.inputs, gf))
-        self.freq = 0 if isinstance(freq, bool) else freq
-        self.beta = beta
-        self.types = types
-        if log_freq is None:
-            self.log_freq = self.freq
-        else:
-            self.log_freq = log_freq
-        assert len(model.outputs) == len(types)
-
-    @staticmethod
-    def collect_weights(model):
-        x_values = []
-        for weights in model.trainable_weights:
-            x_values.append(tf.reshape(weights, (-1,)))
-        return tf.concat(x_values, axis=0)
-
-    def update(self, epoch):
-        loss_gradients = self.eval_diag_ntk()
-        self.update_loss_weights(epoch, loss_gradients)
-        self.update_loss_gradients(epoch, loss_gradients)
-
-    def on_train_begin(self, logs=None):
-        self.update(0)
-
-    def on_epoch_begin(self, epoch, logs=None):
-        if self.freq > 0 and (epoch + 1) % self.freq == 0:
-            self.update(epoch)
-
-    def on_epoch_end(self, epoch, logs={}):
-        # log gradient values
-        logs['adaptive_weights'] = self.loss_weights
-        # log norm2 of gradients
-        logs['loss_gradients'] = self.loss_gradients
-
-    def eval_full_ntk(self):
-        # eval new gradients
-        num_samples = self.inputs[0].shape[0]
-        ntk = [
-            [np.zeros((num_samples,num_samples)) for lgi in self.loss_grads]
-            for lgj in self.loss_grads
-        ]
-        for i in range(num_samples):
-            xi = [v[i:i+1, :] for v in self.inputs]
-            for j in range(num_samples):
-                xj = [v[j:j+1, :] for v in self.inputs]
-                for li, lgi in enumerate(self.loss_grads):
-                    if self.weights[li][i] == 0.: continue
-                    gi = np.concatenate([np.abs(wg).flatten() for wg in lgi(xi)])
-                    for lj, lgj in enumerate(self.loss_grads):
-                        if self.weights[lj][j] == 0.: continue
-                        gj = np.concatenate([np.abs(wg).flatten() for wg in lgj(xj)])
-                        gij = np.dot(gi, gj)
-                        ntk[li][lj][i, j] = gij
-        return ntk
-
-    def eval_diag_ntk(self):
-        # eval new gradients
-        num_samples = self.inputs[0].shape[0]
-        updated_NTK = [np.zeros((num_samples,)) for lgi in self.loss_grads]
-        # start_time = time()
-        for li, lgi in enumerate(self.loss_grads):
-            for i in range(num_samples):
-                wi = self.weights[li][i]
-                if wi == 0.: continue
-                xi = [v[i:i + 1, :] for v in self.inputs]
-                gi = np.concatenate([np.abs(wg).flatten() for wg in lgi(xi)])
-                gij = np.dot(gi, gi)
-                updated_NTK[li][i] = gij
-        # print(time() - start_time)
-        return updated_NTK
-
-    def eval_loss_weights(self, updated_grads):
-        # Method 1: normalization by PDE.
-        # eval max normalization on PDE.
-        ref_grad = []
-        for ws in updated_grads:
-            ref_grad.append(ws.sum())
-        normalization_grad = sum(ref_grad)
-        # evaluate new weights
-        new_weights = []
-        for i, type in enumerate(self.types):
-            ref_grad_i = ref_grad[i] if ref_grad[i] != 0. else np.mean(ref_grad)
-            new_weights.append(normalization_grad / ref_grad_i)
-        return new_weights
-
-    def update_loss_weights(self, epoch, updated_grads):
-        new_weights = self.eval_loss_weights(updated_grads)
-        norm = 1.0 #sum(new_weights)
-        self.loss_weights = []
-        # evaluate new weights
-        for i, wi in enumerate(self.model.loss_weights):
-            # gp_weight = new_weights[i] / K.get_value(wi)
-            # new_val = (1.0 - self.beta) * K.get_value(wi) + self.beta * gp_weight
-            new_val = new_weights[i]/norm
-            K.set_value(self.model.loss_weights[i], new_val)
-            self.loss_weights.append(new_val)
-        # print updates
-        print('\n+ adaptive_weights at epoch {}:'.format(epoch+1), self.loss_weights)
-
-    def update_loss_gradients(self, epoch, updated_grads):
-        self.loss_gradients = [np.linalg.norm(lgi) for lgi in updated_grads]
-
-    @staticmethod
-    def prepare_inputs(*args, **kwargs):
-        kwargs['method'] = 'NTK'
-        if len(args) == 1:
-            kwargs['freq'] = args[0]
-        elif len(args) > 0:
-            raise ValueError
-        return kwargs
-
+#
 
 @keras_export('keras.callbacks.NTKSampleWeight')
 class NTKSampleWeight(Callback):
@@ -798,7 +1176,7 @@ class NTKSampleWeight(Callback):
             ws = self.weights[i]
             gf = tf_gradients(yp, model.trainable_weights, unconnected_gradients='zero')
             self.loss_grads.append(K.function(model.inputs, gf))
-        self.freq = 0 if isinstance(freq, bool) else freq
+        self.freq = np.Inf if (freq==True or freq==0) else freq
         self.beta = beta
         self.types = types
         if log_freq is None:
@@ -921,7 +1299,7 @@ class AdaptiveSampleWeight(Callback):
             self.losses.append(
                 K.function(model.inputs, yp)
             )
-        self.freq = 0 if isinstance(freq, bool) else freq
+        self.freq = np.Inf if (freq==True or freq==0) else freq
         self.beta = beta
         self.types = types
         if log_freq is None:
@@ -967,7 +1345,7 @@ class AdaptiveSampleWeight2(Callback):
             self.loss = K.function(model.inputs, model.outputs[0])
         else:
             self.loss = K.function(model.inputs, loss.outputs)
-        self.freq = 0 if isinstance(freq, bool) else freq
+        self.freq = np.Inf if (freq==True or freq==0) else freq
         self.beta = beta
         if log_freq is None:
             self.log_freq = self.freq

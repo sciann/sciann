@@ -88,9 +88,10 @@ def initialize_bib(bib_file):
 def append_to_bib(bib_entery):
     global _BIBLIOGRAPHY
     global _BIBLIOGRAPHY_TO_OUTPUT
-    bib = _BIBLIOGRAPHY.entries[bib_entery]
-    if bib not in _BIBLIOGRAPHY_TO_OUTPUT:
-        _BIBLIOGRAPHY_TO_OUTPUT.append(bib)
+    for bib_entery_i in to_list(bib_entery):
+        bib = _BIBLIOGRAPHY.entries[bib_entery_i]
+        if bib not in _BIBLIOGRAPHY_TO_OUTPUT:
+            _BIBLIOGRAPHY_TO_OUTPUT.append(bib)
 
 
 def get_bibliography(format='bibtex', file_name=None):
@@ -205,18 +206,23 @@ def prepare_default_activations_and_initializers(actfs, seed=None):
     kernel_initializer = []
     for lay, actf in enumerate(to_list(actfs)):
         if isinstance(actf, str):
-            lay_actf = actf.lower().split('l-')
+            lay_actf = actf.lower().split('-')
+            f = get_activation(lay_actf[-1])
+        elif callable(actf):
+            lay_actf = actf.__name__.lower().split('-')
+            f = actf
         else:
-            raise ValueError('expected a string for actf.')
+            raise ValueError('expected a string for actf: {}'.format(actf))
+
         bias_initializer.append(BInitializer(lay_actf[-1], lay, seed))
         kernel_initializer.append(KInitializer(lay_actf[-1], lay, seed))
-        f = get_activation(lay_actf[-1])
         w = kernel_initializer[-1].w0
-        if len(lay_actf) == 1:
-            activations.append(SciActivation(w, f))
-        else:
+
+        if len(lay_actf) == 2:
             append_to_bib("jagtap2020locally")
-            activations.append(SciActivationLayer(w, f))
+            activations.append(SciActivationLayer(w, f, lay_actf[0]))
+        else:
+            activations.append(SciActivation(w, f))
 
     return activations, bias_initializer, kernel_initializer
 

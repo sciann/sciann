@@ -108,6 +108,7 @@ class GeneratorWrapper(keras.utils.Sequence):
         self._num_batches = int((self._size-1)/batch_size) + 1
         self._shuffle = shuffle
         self._ids = np.arange(0, self._size)
+        self._reshuffle()
         print("\nTotal samples: {} ".format(self._size))
         print("Batch size: {} ".format(min(self._batch_size, self._size)))
         print("Total batches: {} \n".format(self._num_batches))
@@ -116,8 +117,6 @@ class GeneratorWrapper(keras.utils.Sequence):
         return self._num_batches
 
     def __getitem__(self, index):
-        if self._num_batches > 1 and index == 0 and self._shuffle:
-            self._ids = np.random.choice(self._size, self._size, replace=False)
         start = index * self._batch_size
         end = min(start + self._batch_size, self._size)
         ids = self._ids[start: end]
@@ -125,9 +124,16 @@ class GeneratorWrapper(keras.utils.Sequence):
         outputs = [v[ids, :] for v in self._outputs]
         sample_weights = [v[ids] for v in self._sample_weights]
         return inputs, outputs, sample_weights
+    
+    def on_epoch_end(self):
+        self._reshuffle()
 
     def get_data(self):
         return self._inputs, self._outputs, self._sample_weights
+
+    def _reshuffle(self):
+        if self._num_batches > 1 and self._shuffle:
+            self._ids = np.random.choice(self._size, self._size, replace=False)
 
 
 class ScipyOptimizer(object):
@@ -141,43 +147,45 @@ class ScipyOptimizer(object):
         self._layers = [layer for layer in model._layers if layer.weights]
         self._weights_size = 0
         for layer in self._layers:
-            for w in layer.weights:
-                if not w.trainable:
-                    continue
-                self._weights_size += np.prod(w.shape)
+            if layer.trainable:
+                for w in layer.weights:
+                    if w.trainable:
+                        self._weights_size += np.prod(w.shape)
 
     def _update_weights(self, x):
         x_offset = 0
         for layer in self._layers:
-            w_list = []
-            w_trainable = [w.trainable for w in layer.weights]
-            batch_update = False not in w_trainable
-            for w in layer.weights:
-                if not w.trainable:
-                    continue
-                shape = w.get_shape()
-                w_size = np.prod(shape)
-                value = np.array(x[x_offset:x_offset+w_size]).reshape(shape)
+            if layer.trainable:
+                w_list = []
+                w_trainable = [w.trainable for w in layer.weights]
+                batch_update = False not in w_trainable
+                for w in layer.weights:
+                    if not w.trainable:
+                        continue
+                    shape = w.get_shape()
+                    w_size = np.prod(shape)
+                    value = np.array(x[x_offset:x_offset+w_size]).reshape(shape)
+                    if batch_update:
+                        w_list.append(value)
+                    else:
+                        K.set_value(w, value)
+                    x_offset += w_size
                 if batch_update:
-                    w_list.append(value)
-                else:
-                    K.set_value(w, value)
-                x_offset += w_size
-            if batch_update:
-                layer.set_weights(w_list)
+                    layer.set_weights(w_list)
         assert x_offset == self._weights_size
 
     def _collect_weights(self):
         x_values = np.empty(self._weights_size)
         x_offset = 0
         for layer in self._layers:
-            w_trainable = [w.trainable for w in layer.weights]
-            for var, trainable in zip(layer.get_weights(), w_trainable):
-                if not trainable:
-                    continue
-                w_size = var.size
-                x_values[x_offset:x_offset+w_size] = var.reshape(-1)
-                x_offset += w_size
+            if layer.trainable:
+                w_trainable = [w.trainable for w in layer.weights]
+                for var, trainable in zip(layer.get_weights(), w_trainable):
+                    if not trainable:
+                        continue
+                    w_size = var.size
+                    x_values[x_offset:x_offset+w_size] = var.reshape(-1)
+                    x_offset += w_size
         assert x_offset == self._weights_size
         return x_values
 
