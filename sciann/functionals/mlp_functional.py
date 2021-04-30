@@ -131,15 +131,18 @@ class MLPFunctional(object):
                     assert False
 
         y_pred = to_list(model(xs))
-
-        # revert back to normal.
-        xs = unpack_singleton([x.reshape(sd) for x, sd in zip(xs, shape_default)])
-
+        
+        # return uniform shapes. 
         if all([shape_default[0]==sd for sd in shape_default[1:]]):
             try:
                 y_pred = [y.reshape(shape_default[0]) for y in y_pred]
             except:
                 print("Input and output dimensions need re-adjustment for post-processing.")
+
+        # revert back to normal.
+        for i, sd in enumerate(shape_default):
+            xs[i] = xs[i].reshape(sd)
+        xs = unpack_singleton(xs)
 
         return unpack_singleton(y_pred)
 
