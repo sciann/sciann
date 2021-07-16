@@ -35,6 +35,7 @@ class SciActivation(k.layers.Activation):
             get_activation(activation),
             **kwargs
         )
+        self.activation_name = self.activation.__name__
         self.w0 = w0
 
     def call(self, inputs):
@@ -70,6 +71,7 @@ class SciActivationLayer(k.layers.Layer):
     def __init__(self, alpha=1.0, activation='linear', type='l', **kwargs):
         super(SciActivationLayer, self).__init__(**kwargs)
         self.activation = get_activation(activation)
+        self.activation_name = self.activation.__name__
         self.alpha_initializer = default_constant_initializer(alpha)
         self.alpha_regularizer = None
         self.alpha_constraint = None
@@ -109,6 +111,56 @@ class SciActivationLayer(k.layers.Layer):
             'shared_axes': self.shared_axes
         }
         base_config = super(SciActivationLayer, self).get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+    @tf_utils.shape_type_conversion
+    def compute_output_shape(self, input_shape):
+        return input_shape
+
+
+@keras_export('keras.layers.SciRowdyActivationLayer')
+class SciRowdyActivationLayer(k.layers.Layer):
+    """Adds multiple activations together.
+
+    # Arguments
+        activation: list of activations functions of class SciActivation or SciActivationLayer.
+
+    # Output shape
+        Same shape as input.
+    """
+
+    def __init__(self, phis, **kwargs):
+        super(SciRowdyActivationLayer, self).__init__(**kwargs)
+        self.phis = phis
+        self.activation = None
+        self.activation_name = "rowdy"
+        self.alpha_initializer = default_constant_initializer(1.0)
+        self.alpha_regularizer = None
+        self.alpha_constraint = None
+
+    @tf_utils.shape_type_conversion
+    def build(self, input_shape):
+        for i, phi in enumerate(self.phis):
+            self.add_weight(
+                shape=[1, ],
+                name=f'alpha{i}',
+                initializer=self.alpha_initializer,
+                regularizer=self.alpha_regularizer,
+                constraint=self.alpha_constraint)
+        self.built = True
+
+    def call(self, inputs):
+        sums = [a*f(inputs) for a, f in zip(self.weights, self.phis)]
+        return tf_math.add_n(sums, name='rowdy_sum')
+
+    def get_config(self):
+        config = {
+            'alpha_initializer': initializers.serialize(self.alpha_initializer),
+            'alpha_regularizer': regularizers.serialize(self.alpha_regularizer),
+            'alpha_constraint': constraints.serialize(self.alpha_constraint),
+            'shared_axes': self.shared_axes
+        }
+        base_config = super(SciRowdyActivationLayer, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))
 
     @tf_utils.shape_type_conversion

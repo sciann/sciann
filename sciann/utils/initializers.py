@@ -4,32 +4,17 @@ from tensorflow.python import keras as k
 
 class SciKernelInitializer(k.initializers.VarianceScaling):
 
-    def __init__(self, actf='linear', lay=0, seed=None):
-        self.actf = actf
+    def __init__(self, lay=0, seed=None):
         self.lay = lay
 
-        # Kernel initializer
-        if actf in ('linear', 'relu'):
-            self.w0 = 1.0
-            scale = 1.0
-            distribution = 'truncated_normal'
-            mode = 'fan_avg'
-        elif actf in ('tanh', 'atan'):
-            self.w0 = 1.0
-            scale = 1.0
-            distribution = 'truncated_normal'
-            mode = 'fan_avg'
-        elif actf in ('sin', 'cos'):
-            self.w0 = 6.0 if lay==0 else 1.0
-            scale = 1.0
-            distribution = 'truncated_normal'
+        self.w0 = 1.0
+        scale = 1.0
+        distribution = 'truncated_normal'
+        if lay==0:
             mode = 'fan_in'
         else:
-            self.w0 = 1.0
-            scale = 1.0
-            distribution = 'truncated_normal'
             mode = 'fan_avg'
-        #
+
         # # based on Wang Yang's work
         # if lay==0:
         #     self.w0 = lambda x: k.sqrt(x.shape[-1])
@@ -48,7 +33,6 @@ class SciKernelInitializer(k.initializers.VarianceScaling):
         config = {
             'w0': self.w0,
             'lay': self.lay,
-            'actf': self.actf,
             'bias': self.bias
         }
         return dict(list(base_config.items()) + list(config.items()))
@@ -56,9 +40,8 @@ class SciKernelInitializer(k.initializers.VarianceScaling):
 
 class SciBiasInitializer(k.initializers.RandomUniform):
 
-    def __init__(self, actf='linear', lay=0, seed=None):
+    def __init__(self, lay=0, seed=None):
         self.w0 = 1.0
-        self.actf = actf
         self.lay = lay
 
         super(SciBiasInitializer, self).__init__(seed=seed)
@@ -67,8 +50,7 @@ class SciBiasInitializer(k.initializers.RandomUniform):
         base_config = super().get_config()
         config = {
             'w0': self.w0,
-            'lay': self.lay,
-            'actf': self.actf
+            'lay': self.lay
         }
         return dict(list(base_config.items()) + list(config.items()))
 

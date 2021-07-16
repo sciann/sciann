@@ -32,11 +32,11 @@ model = SciModel(x, Data(Fxy),
 
 ---
 
-<span style="float:right;">[[source]](https://github.com/sciann/sciann/tree/master/sciann/functionals/functional.py#L28)</span>
-### Functional
+<span style="float:right;">[[source]](https://github.com/sciann/sciann/tree/master/sciann/functionals/mlp_functional.py#L31)</span>
+### MLPFunctional
 
 ```python
-sciann.functionals.functional.Functional(fields=None, variables=None, hidden_layers=None, activation='tanh', output_activation='linear', kernel_initializer=None, bias_initializer=None, kernel_regularizer=None, bias_regularizer=None, dtype=None, trainable=True)
+sciann.functionals.mlp_functional.MLPFunctional(inputs, outputs, layers)
 ```
 
 Configures the Functional object (Neural Network).
@@ -57,6 +57,8 @@ __Arguments__
     Last layer will have a linear output.
 - __output_activation__: defaulted to "linear".
     Activation function to be applied to the network output.
+- __res_net__: (True, False). Constructs a resnet architecture.
+    Defaulted to False.
 - __kernel_initializer__: Initializer of the `Kernel`, from `k.initializers`.
 - __bias_initializer__: Initializer of the `Bias`, from `k.initializers`.
 - __kernel_regularizer__: Regularizer for the kernel.
@@ -103,11 +105,11 @@ __Raises__
     
 ----
 
-<span style="float:right;">[[source]](https://github.com/sciann/sciann/tree/master/sciann/functionals/field.py#L13)</span>
+<span style="float:right;">[[source]](https://github.com/sciann/sciann/tree/master/sciann/functionals/field.py#L14)</span>
 ### Field
 
 ```python
-sciann.functionals.field.Field(name=None, units=1, activation=<function linear at 0x7fa42b187cb0>, kernel_initializer=<tensorflow.python.ops.init_ops.GlorotNormal object at 0x7fa42c614490>, bias_initializer=<tensorflow.python.keras.initializers.initializers_v1.RandomUniform object at 0x7fa3f85ce950>, kernel_regularizer=None, bias_regularizer=None, trainable=True, dtype=None)
+sciann.functionals.field.Field(name=None, units=1, activation=<function linear at 0x7f87707bc8b0>, kernel_initializer=None, bias_initializer=None, kernel_regularizer=None, bias_regularizer=None, trainable=True, use_bias=True, dtype=None)
 ```
 
 Configures the `Field` class for the model outputs.
@@ -129,6 +131,7 @@ __Arguments__
 - __bias_regularizer__: Regularizer for the bias.
     To set l1 and l2 to custom values, pass [l1, l2] or {'l1':l1, 'l2':l2}.
 - __trainable__: Boolean to activate parameters of the network.
+- __use_bias__: Boolean to add bias to the network.
 - __dtype__: data-type of the network parameters, can be
     ('float16', 'float32', 'float64').
 
@@ -138,7 +141,7 @@ __Raises__
     
 ----
 
-<span style="float:right;">[[source]](https://github.com/sciann/sciann/tree/master/sciann/functionals/parameter.py#L26)</span>
+<span style="float:right;">[[source]](https://github.com/sciann/sciann/tree/master/sciann/functionals/parameter.py#L31)</span>
 ### Parameter
 
 ```python
@@ -163,4 +166,154 @@ __Arguments__
     True (default) if only non-negative values are expected.
 - __**kwargs__: keras.layer.Dense accepted arguments.
 
+    
+----
+
+### eval
+
+
+```python
+eval()
+```
+
+
+Evaluates the functional object for a given input.
+
+__Arguments__
+
+(SciModel, Xs): 
+Evalutes the functional object from the beginning 
+of the graph defined with SciModel. 
+The Xs should match those of SciModel. 
+
+(Xs):
+Evaluates the functional object from inputs of the functional. 
+Xs should match those of inputs to the functional. 
+
+__Returns__
+
+Numpy array of dimensions of network outputs. 
+
+__Raises__
+
+- __ValueError__:
+- __TypeError__:
+    
+----
+
+### get_weights
+
+
+```python
+get_weights(at_layer=None)
+```
+
+
+Get the weights and biases of different layers.
+
+__Arguments__
+
+- __at_layer__: 
+    Get the weights of a specific layer. 
+
+__Returns__
+
+List of numpy array. 
+    
+----
+
+### set_weights
+
+
+```python
+set_weights(weights)
+```
+
+
+Set the weights and biases of different layers.
+
+__Arguments__
+
+- __weights__: Should take the dimensions as the output of ".get_weights"
+
+__Returns __
+
+    
+----
+
+### reinitialize_weights
+
+
+```python
+reinitialize_weights()
+```
+
+
+Re-initialize the weights and biases of a functional object.
+
+__Arguments__
+
+
+__Returns __
+
+
+    
+----
+
+### count_params
+
+
+```python
+count_params()
+```
+
+
+Total number of parameters of a functional.
+
+__Arguments__
+
+
+__Returns __
+
+Total number of parameters.
+    
+----
+
+### set_trainable
+
+
+```python
+set_trainable(val, layers=None)
+```
+
+
+Set the weights and biases of a functional object trainable or not-trainable.
+Note: The SciModel should be called after this.
+
+__Arguments__
+
+- __val__: (Ture, False)
+- __layers__: list of layers to be set trainable or non-trainable.
+    defaulted to None.
+
+__Returns __
+
+    
+----
+
+### split
+
+
+```python
+split()
+```
+
+
+In the case of `Functional` with multiple outputs,
+you can split the outputs and get an associated functional.
+
+__Returns__
+
+(f1, f2, ...): Tuple of splitted `Functional` objects
+    associated to each output.
     

@@ -27,7 +27,7 @@ from tensorflow.python.keras.regularizers import l1_l2
 
 from .initializers import SciKernelInitializer as KInitializer
 from .initializers import SciBiasInitializer as BInitializer
-from .activations import get_activation, SciActivation, SciActivationLayer
+from .activations import get_activation, SciActivation, SciActivationLayer, SciRowdyActivationLayer
 from .validations import is_functional
 
 from pybtex.database.input import bibtex
@@ -205,24 +205,32 @@ def prepare_default_activations_and_initializers(actfs, seed=None):
     bias_initializer = []
     kernel_initializer = []
     for lay, actf in enumerate(to_list(actfs)):
-        if isinstance(actf, str):
-            lay_actf = actf.lower().split('-')
-            f = get_activation(lay_actf[-1])
-        elif callable(actf):
-            lay_actf = actf.__name__.lower().split('-')
-            f = actf
-        else:
-            raise ValueError('expected a string for actf: {}'.format(actf))
-
-        bias_initializer.append(BInitializer(lay_actf[-1], lay, seed))
-        kernel_initializer.append(KInitializer(lay_actf[-1], lay, seed))
+        # initializers.
+        bias_initializer.append(BInitializer(lay, seed))
+        kernel_initializer.append(KInitializer(lay, seed))
         w = kernel_initializer[-1].w0
-
-        if len(lay_actf) == 2:
-            append_to_bib("jagtap2020locally")
-            activations.append(SciActivationLayer(w, f, lay_actf[0]))
+        # support rowdy net.
+        layer_actfs = []
+        for sig in to_list(actf):
+            if isinstance(sig, str):
+                lay_actf = sig.lower().split('-')
+                f = get_activation(lay_actf[-1])
+            elif callable(sig):
+                lay_actf = sig.__name__.lower().split('-')
+                f = sig
+            else:
+                raise ValueError('expected a string for actf: {}'.format(sig))
+            if len(lay_actf) == 2:
+                append_to_bib("jagtap2020locally")
+                layer_actfs.append(SciActivationLayer(w, f, lay_actf[0]))
+            else:
+                layer_actfs.append(SciActivation(w, f))
+        if len(layer_actfs) == 1:
+            sig_layer = layer_actfs[0]
         else:
-            activations.append(SciActivation(w, f))
+            append_to_bib("jagtap2021deep")
+            sig_layer = SciRowdyActivationLayer(layer_actfs)
+        activations.append(sig_layer)
 
     return activations, bias_initializer, kernel_initializer
 

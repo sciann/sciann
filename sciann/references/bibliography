@@ -80,3 +80,18 @@
   organization={PMLR}
 }
 
+@article{maddu2021inversedirichlet,
+      title={Inverse-Dirichlet Weighting Enables Reliable Training of Physics Informed Neural Networks},
+      author={Suryanarayana Maddu and Dominik Sturm and Christian L. Müller and Ivo F. Sbalzarini},
+      year={2021},
+      eprint={2107.00940},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG}
+}
+
+@article{jagtap2021deep,
+  title={Deep Kronecker neural networks: A general framework for neural networks with adaptive activation functions},
+  author={Jagtap, Ameya D and Shin, Yeonjong and Kawaguchi, Kenji and Karniadakis, George Em},
+  journal={arXiv preprint arXiv:2105.09513},
+  year={2021}
+}

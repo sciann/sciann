@@ -16,6 +16,7 @@ SciANN model.
 import numpy as np
 from sciann import Variable, Functional, SciModel, Parameter
 from sciann.constraints import Data, MinMax
+import sciann as sn 
 
 
 # Synthetic data generated from sin function over [0, 2pi]
@@ -24,9 +25,11 @@ y_true = np.sin(x_true)
 
 # The network inputs should be defined with Variable.
 x = Variable('x', dtype='float64')
+xf = Functional('xf', x)
+xf.set_trainable(False)
 
 # Each network is defined by Functional.
-y = Functional('y', x, [10, 10, 10], activation='tanh')
+y = Functional('y', xf, [10, 10, 10], activation='tanh')
 
 d = Parameter(2.0, inputs=x)
 
@@ -34,13 +37,19 @@ d = Parameter(2.0, inputs=x)
 c1 = Data(y)
 
 # The model is formed with input `x` and condition `c1`.
-model = SciModel(x, c1)
+model = SciModel(x, [c1], optimizer='adam')
+model.summary()
 
 # Training: .train runs the optimization and finds the parameters.
-model.train(x_true, 
-            y_true,
+model.train(x_true,
+            [y_true],
+            learning_rate={"scheduler":"SineExponentialDecay", "verify": True},
             batch_size=32,
-            epochs=100)
+            epochs=2,
+            adaptive_weights={'method': "NTK", 'freq': 10, "use_score": True, "alpha": 1.}
+            )
 
 # used to evaluate the model after the training.
-y_pred = model.predict(x_true)
+y_pred = y.eval(model, x_true)
+
+print(x_true.shape, y_pred.shape)

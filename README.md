@@ -1,3 +1,10 @@
+[![PyPI Version](https://badge.fury.io/py/SciANN.svg)](https://badge.fury.io/py/SciANN)
+[![Downloads](https://pepy.tech/badge/sciann)](https://pepy.tech/project/sciann)
+[![Downloads](https://pepy.tech/badge/sciann/month)](https://pepy.tech/project/sciann)
+[![Downloads](https://pepy.tech/badge/sciann/week)](https://pepy.tech/project/sciann)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/sciann/sciann/blob/master/LICENSE)
+
+
 # SciANN: Neural Networks for Scientific Computations  
 
 SciANN is a Keras wrapper for scientific computations and physics-informed deep learning.
@@ -18,16 +25,14 @@ For more details, check out our review paper at [https://arxiv.org/abs/2005.0880
 Cite SciANN in your publications if it helps your research:
 
 ```
-@misc{haghighat2020sciann,
-    title={SciANN: A Keras wrapper for scientific computations and 
-           physics-informed deep learning using artificial neural networks},
-    author={Ehsan Haghighat and Ruben Juanes},
-    year={2020},
-    eprint={2005.08803},
-    archivePrefix={arXiv},
-    primaryClass={cs.OH},
-    url = {https://www.sciann.com}
-    howpublished={\url{https://github.com/sciann/sciann.git}}
+@article{haghighat2021sciann,
+  title={SciANN: A Keras/TensorFlow wrapper for scientific computations and physics-informed deep learning using artificial neural networks},
+  author={Haghighat, Ehsan and Juanes, Ruben},
+  journal={Computer Methods in Applied Mechanics and Engineering},
+  volume={373},
+  pages={113552},
+  year={2021},
+  publisher={Elsevier}
 }
 ```
 

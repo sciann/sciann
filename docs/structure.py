@@ -33,7 +33,7 @@ Constraints
 
 '''
 from sciann import utils
-from sciann import Functional
+from sciann.functionals.mlp_functional import MLPFunctional
 from sciann import Variable
 from sciann import Field
 from sciann import SciModel
@@ -61,19 +61,19 @@ PAGES = [
     {
         'page': 'functionals.md',
         'classes': [
-            Functional,
+            MLPFunctional,
             Variable,
             Field,
             Parameter,
         ],
         'methods': [
-            Functional.eval,
-            Functional.get_weights,
-            Functional.set_weights,
-            Functional.reinitialize_weights,
-            Functional.count_params,
-            Functional.set_trainable,
-            Functional.split,
+            MLPFunctional.eval,
+            MLPFunctional.get_weights,
+            MLPFunctional.set_weights,
+            MLPFunctional.reinitialize_weights,
+            MLPFunctional.count_params,
+            MLPFunctional.set_trainable,
+            MLPFunctional.split,
         ]
     },
     {

@@ -30,7 +30,7 @@ Check Keras' documentation for more details.
 
 ---
 
-<span style="float:right;">[[source]](https://github.com/sciann/sciann/tree/master/sciann/models/model.py#L25)</span>
+<span style="float:right;">[[source]](https://github.com/sciann/sciann/tree/master/sciann/models/model.py#L31)</span>
 ### SciModel
 
 ```python
@@ -81,7 +81,7 @@ __Raises__
 
 
 ```python
-train(x_true, y_true, weights=None, target_weights=None, batch_size=64, epochs=100, learning_rate=0.001, shuffle=True, callbacks=None, reduce_lr_after=None, reduce_lr_min_delta=0.001, stop_after=None, stop_loss_value=1e-08, save_weights_to=None, save_weights_freq=0, default_zero_weight=0.0)
+train(x_true, y_true=None, weights=None, target_weights=None, batch_size=64, epochs=100, learning_rate=0.001, adaptive_weights=None, adaptive_sample_weights=None, log_loss_gradients=None, shuffle=True, callbacks=[], stop_lr_value=1e-08, reduce_lr_after=None, reduce_lr_min_delta=0.0, stop_after=None, stop_loss_value=1e-08, log_parameters=None, log_functionals=None, log_loss_landscape=None, save_weights=None, default_zero_weight=0.0, validation_data=None)
 ```
 
 
@@ -90,6 +90,7 @@ Performs the training on the model.
 __Arguments__
 
 - __x_true__: list of `Xs` associated to targets of `Y`.
+    Alternatively, you can pass a Sequence object (keras.utils.Sequence).
     Expecting a list of np.ndarray of size (N,1) each,
     with N as the sample size.
 - __y_true__: list of true `Ys` associated to the targets defined during model setup.
@@ -114,15 +115,43 @@ __Arguments__
         learning_rate = ([0, 100, 1000], [0.001, 0.0005, 0.00001])
 - __shuffle__: Boolean (whether to shuffle the training data).
     Default value is True.
+- __adaptive_weights__: Pass a Dict with the following keys:
+    . method: GP or NTK.
+    . freq: Freq to update the weights.
+    . log_freq: Freq to log the weights and gradients in the history object.
+    . beta: The beta parameter in from Gradient Pathology paper.
+- __log_loss_gradients__: Pass a Dict with the following keys:
+    . freq: Freq of logs. Defaulted to 100.
+    . path: Path to log the gradients.
 - __callbacks__: List of `keras.callbacks.Callback` instances.
 - __reduce_lr_after__: patience to reduce learning rate or stop after certain missed epochs.
     Defaulted to epochs max(10, epochs/10).
-- __reduce_lr_min_delta__: min absolute change in total loss value that is considered a successful change. 
+- __stop_lr_value__: stop the training if learning rate goes lower than this value.
+    Defaulted to 1e-8.
+- __reduce_lr_min_delta__: min absolute change in total loss value that is considered a successful change.
     Defaulted to 0.001. 
     This values affects number of failed attempts to trigger reduce learning rate based on reduce_lr_after. 
 - __stop_after__: To stop after certain missed epochs. Defaulted to total number of epochs.
 - __stop_loss_value__: The minimum value of the total loss that stops the training automatically. 
-    Defaulted to 1e-8. 
+    Defaulted to 1e-8.
+- __log_parameters__: Dict object expecting the following keys:
+    . parameters: pass list of parameters.
+    . freq: pass freq of outputs.
+- __log_functionals__: Dict object expecting the following keys:
+    . functionals: List of functionals to log their training history.
+    . inputs: The input grid to evaluate the value of each functional.
+              Should be of the same size as the inputs to the model.train.
+    . path: Path to the location that the csv files will be logged.
+    . freq: Freq of logging the functionals.
+- __log_loss_landscape__: Dict object expecting the following arguments:
+    . norm: defaulted to 2.
+    . resolution: defaulted to 10.
+    . path: Path to the location that the csv files will be logged.
+    . freq: Freq of logging the loss landscape.
+- __save_weights__: (dict) Dict object expecting the following information:
+    . path: defaulted to the current path.
+    . freq: freq of calling CheckPoint callback.
+    . best: If True, only saves the best loss, otherwise save all weights at every `freq` epochs.
 - __save_weights_to__: (file_path) If you want to save the state of the model (at the end of the training).
 - __save_weights_freq__: (Integer) Save weights every N epcohs.
     Defaulted to 0.
@@ -182,7 +211,10 @@ __Arguments__
 - "mse" for `Mean Squared Error` or
 - "mae" for `Mean Absolute Error` or
 - "se" for `Squared Error` or
-- "ae" for `Absolute Error`.
+- "ae" for `Absolute Error` or
+- "sse" for `Squared Sum Error` or
+- "ase" for `Absolute Sum Error` or
+- "rse" for `Reduce Sum Error`.
 
 __Returns__
 

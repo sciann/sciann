@@ -12,6 +12,7 @@ from tensorflow.python.keras.layers import Dense
 from tensorflow.python.keras.layers import Activation
 from tensorflow.python.keras.layers import Concatenate
 from tensorflow.python.keras.layers import Lambda
+from tensorflow.python.keras.layers import BatchNormalization
 from tensorflow.python.keras.models import Model
 from tensorflow import tensordot, expand_dims
 
@@ -179,7 +180,7 @@ def Functional(
             )
             res_output = layers[-1](net_input)
             # Apply the activation.
-            if activations[0].activation.__name__ != 'linear':
+            if activations[0].activation_name != 'linear':
                 layers.append(activations[0])
                 res_outputs.append(layers[-1](res_output))
         net[-1] = res_outputs[-1]
@@ -198,8 +199,12 @@ def Functional(
         )
         layers.append(layer)
         net[-1] = layer(net[-1])
+        # # Add batch normalization. 
+        # layer = BatchNormalization()
+        # layers.append(layer)
+        # net[-1] = layer(net[-1])
         # Apply the activation.
-        if activations[nLay].activation.__name__ != 'linear': #nLay<len(hidden_layers)-1 and
+        if activations[nLay].activation_name != 'linear':
             layer = activations[nLay]
             layers.append(layer)
             net[-1] = layer(net[-1])
@@ -222,7 +227,7 @@ def Functional(
         last_layers = [out]
         last_output = out(net_output)
         # add the activation on the output.
-        if activations[-1].activation.__name__ != 'linear':
+        if activations[-1].activation_name != 'linear':
             layer = activations[-1]
             last_layers.append(layer)
             last_output = layer(last_output)

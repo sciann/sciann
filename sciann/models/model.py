@@ -21,6 +21,7 @@ from ..utils import unpack_singleton, to_list
 from ..utils import is_variable, is_constraint, is_functional
 from ..utils.optimizers import GradientObserver, ScipyOptimizer, GeneratorWrapper
 from ..utils.callbacks import *
+from ..utils.schedules import setup_lr_scheduler
 
 from ..functionals import Variable
 from ..functionals import RadialBasis
@@ -116,13 +117,17 @@ class SciModel(object):
         for cond in targets:
             output_vars += cond().outputs
         # prepare loss_functions.
-        if isinstance(loss_func, str):
-            loss_func = SciModel.loss_functions(loss_func)
-        elif not callable(loss_func):
-            raise TypeError(
-                'Please provide a valid loss function from ("mse", "mae") '
-                + "or a callable function for input of tensor types. "
-            )
+        if not isinstance(loss_func, list):
+            loss_func = len(output_vars)*[loss_func]
+        # prepare the losses.
+        for i, li in enumerate(loss_func):
+            if isinstance(li, str):
+                loss_func[i] = SciModel.loss_functions(li)
+            elif not callable(li):
+                raise TypeError(
+                    'Please provide a valid loss function from ("mse", "mae") '
+                    + "or a callable function for input of tensor types. "
+                )
         # Initialize the Model form super class.
         model = Model(
             inputs=input_vars,
@@ -233,7 +238,7 @@ class SciModel(object):
               adaptive_sample_weights=None,
               log_loss_gradients=None,
               shuffle=True,
-              callbacks=None,
+              callbacks=[],
               stop_lr_value=1e-8,
               reduce_lr_after=None,
               reduce_lr_min_delta=0.,
@@ -242,8 +247,7 @@ class SciModel(object):
               log_parameters=None,
               log_functionals=None,
               log_loss_landscape=None,
-              save_weights_to=None,
-              save_weights_freq=0,
+              save_weights=None,
               default_zero_weight=0.0,
               validation_data=None,
               **kwargs):
@@ -309,6 +313,10 @@ class SciModel(object):
                 . resolution: defaulted to 10.
                 . path: Path to the location that the csv files will be logged.
                 . freq: Freq of logging the loss landscape.
+            save_weights: (dict) Dict object expecting the following information:
+                . path: defaulted to the current path.
+                . freq: freq of calling CheckPoint callback.
+                . best: If True, only saves the best loss, otherwise save all weights at every `freq` epochs.
             save_weights_to: (file_path) If you want to save the state of the model (at the end of the training).
             save_weights_freq: (Integer) Save weights every N epcohs.
                 Defaulted to 0.
@@ -384,59 +392,52 @@ class SciModel(object):
                 batch_size, shuffle
             )
 
-        if callbacks is None:
-            # default_lr = learning_rate/0.9900
-            # f0 = np.log(1.0/0.9900 - 1.0)
-            # f1 = np.log(1.0/decay_max - 1.0)
-            # decay_epochs = epochs if decay_epochs is None else decay_epochs
-            # a0 = decay_epochs / (f1-f0)
-            # n0 = -a0*f0
-            if reduce_lr_after is None:
-                reduce_lr_after = max([10, epochs/10])
-            if stop_after is None:
-                stop_after = epochs
-            callbacks = []
-            if isinstance(learning_rate, (type(None), float, int)):
-                lr_rates = 0.001 if learning_rate is None else learning_rate
-                K.set_value(self.model.optimizer.lr, lr_rates)
-                if 'lr_scheduler' in self._callbacks and learning_rate is None:
-                    callbacks.append(self._callbacks['lr_scheduler'])
-                else:
-                    callbacks.append(
-                        k.callbacks.ReduceLROnPlateau(
-                            monitor='loss', factor=0.5,
-                            patience=reduce_lr_after, #cooldown=epochs/10,
-                            verbose=1, mode='auto',
-                            min_delta=reduce_lr_min_delta,
-                            min_lr=0.
-                        )
-                    )
-                    self._callbacks['lr_scheduler'] = callbacks[-1]
+        # initialize callbacks.
+        sci_callbacks = []
+        # Learning rate setup.
+        K.set_value(self.model.optimizer.lr, 1e-3)
+        if reduce_lr_after is None:
+            reduce_lr_after = max([10, epochs / 10])
+        if stop_after is None:
+            stop_after = epochs
+        if isinstance(learning_rate, (type(None), float, int)):
+            lr_rates = 0.001 if learning_rate is None else learning_rate
+            K.set_value(self.model.optimizer.lr, lr_rates)
+            lr_scheduler = {
+                "scheduler": "default",
+                "reduce_lr_after": reduce_lr_after,
+                "reduce_lr_min_delta": reduce_lr_min_delta
+            }
+        elif isinstance(learning_rate, (tuple, list)):
+            lr_scheduler = {
+                "scheduler": "learning_rate_scheduler",
+                "lr_epochs": learning_rate[0],
+                "lr_values": learning_rate[1]
+            }
+        elif isinstance(learning_rate, dict):
+            lr_scheduler = learning_rate
+        else:
+            raise ValueError(
+                "learning rate: expecting a `float` or \n  "
+                "a tuple/list of two arrays with `epochs` and `learning rates` or \n  "
+                "a dictionary with scheduler settings. "
+            )
+        if 'lr_scheduler' in self._callbacks and learning_rate is None:
+            sci_callbacks.append(self._callbacks['lr_scheduler'])
+        else:
+            sci_callbacks.append(setup_lr_scheduler(lr_scheduler))
+            self._callbacks['lr_scheduler'] = sci_callbacks[-1]
 
-            elif isinstance(learning_rate, (tuple, list)):
-                lr_epochs = learning_rate[0]
-                lr_rates = learning_rate[1]
-                callbacks.append(
-                    # k.callbacks.LearningRateScheduler(lambda n: default_lr/(1.0 + np.exp((n-n0)/a0))),
-                    k.callbacks.LearningRateScheduler(lambda n: np.interp(n, lr_epochs, lr_rates))
-                )
-                self._callbacks['lr_scheduler'] = callbacks[-1]
+        sci_callbacks += [
+            k.callbacks.EarlyStopping(monitor="loss", mode='auto', verbose=1,
+                                      patience=stop_after, min_delta=1e-9),
+            k.callbacks.TerminateOnNaN(),
+            EarlyStoppingByLossVal(stop_loss_value),
+            EarlyStoppingByLearningRate(stop_lr_value),
+            EpochTime()
+        ]
 
-            else:
-                raise ValueError(
-                    "learning rate: expecting a `float` or a tuple/list of two arrays"
-                    " with `epochs` and `learning rates`"
-                )
-
-            callbacks += [
-                k.callbacks.EarlyStopping(monitor="loss", mode='auto', verbose=1,
-                                          patience=stop_after, min_delta=1e-9),
-                k.callbacks.TerminateOnNaN(),
-                EarlyStoppingByLossVal(stop_loss_value),
-                EarlyStoppingByLearningRate(stop_lr_value),
-                EpochTime()
-            ]
-        
+        # setup target weights.
         len_inputs = len(to_list(self._model.inputs))
         len_outputs = len(to_list(self._model.outputs))
         if target_weights is not None:
@@ -451,19 +452,30 @@ class SciModel(object):
 
         # save model.
         model_file_path = None
-        if save_weights_to is not None:
+        if save_weights is not None:
+            assert isinstance(save_weights, dict), "pass a dictionary containing `path, freq, best`. "
+            save_weights_path = os.curdir() if 'path' not in save_weights.keys() else save_weights['path']
             try:
-                self._model.save_weights("{}-start.hdf5".format(save_weights_to))
-                model_file_path = save_weights_to + "-{epoch:05d}-{loss:.3e}.hdf5"
-                model_check_point = k.callbacks.ModelCheckpoint(
-                    model_file_path, monitor='loss', save_weights_only=True, mode='auto',
-                    period=10 if save_weights_freq==0 else save_weights_freq,
-                    save_best_only=True if save_weights_freq==0 else False
-                )
+                if 'best' in save_weights.keys() and \
+                        save_weights['best'] is True:
+                    model_file_path = save_weights_path + "-best.hdf5"
+                    model_check_point = k.callbacks.ModelCheckpoint(
+                        model_file_path, monitor='loss', save_weights_only=True, mode='auto',
+                        period=10 if 'freq' in save_weights.keys() else save_weights['freq'],
+                        save_best_only=True
+                    )
+                else:
+                    self._model.save_weights("{}-start.hdf5".format(save_weights_path))
+                    model_file_path = save_weights_path + "-{epoch:05d}-{loss:.3e}.hdf5"
+                    model_check_point = k.callbacks.ModelCheckpoint(
+                        model_file_path, monitor='loss', save_weights_only=True, mode='auto',
+                        period=10 if 'freq' in save_weights.keys() else save_weights['freq'],
+                        save_best_only=False
+                    )
             except:
-                print("\nWARNING: Failed to save model.weights to the provided path: {}\n".format(save_weights_to))
+                print("\nWARNING: Failed to save model.weights to the provided path: {}\n".format(save_weights_path))
         if model_file_path is not None:
-            callbacks.append(model_check_point)
+            sci_callbacks.append(model_check_point)
 
         if isinstance(self._model.optimizer, GradientObserver):
             opt = ScipyOptimizer(self._model)
@@ -472,50 +484,20 @@ class SciModel(object):
             opt_fit_func = self._model.fit
 
         if adaptive_weights:
-            if not isinstance(adaptive_weights, dict):
-                adaptive_weights = NTKLossWeight.prepare_inputs(adaptive_weights)
-            if adaptive_weights["method"].upper() == "GP":
-                callbacks.append(
-                    GradientPathologyLossWeight(
-                        self.model, data_generator=data_generator, 
-                        types=[type(v).__name__ for v in self.constraints],
-                        **adaptive_weights
-                    ),
-                )
-            elif adaptive_weights["method"].upper() == "NTK":
-                callbacks.append(
-                    NTKLossWeight(
-                        self.model, data_generator=data_generator, 
-                        types=[type(v).__name__ for v in self.constraints],
-                        **adaptive_weights
-                    ),
-                )
-            elif adaptive_weights["method"].upper() == "MTL":
-                callbacks.append(
-                    MTLLossWeight(
-                        self.model, data_generator=data_generator,
-                        **adaptive_weights
-                    ),
-                )
-            elif adaptive_weights["method"].upper() == "SCORE":
-                callbacks.append(
-                    ScoreLossWeight(
-                        self.model, data_generator=data_generator,
-                        **adaptive_weights
-                    ),
-                )
-            else:
-                raise ValueError(
-                    'adaptive_weights method should be either of the followings: (GP, NTK)'
-                )
-            self._callbacks['adaptive_weights'] = callbacks[-1]
-
+            sci_callbacks.append(
+                setup_adaptive_weight_callback(
+                    adaptive_weights=adaptive_weights,
+                    model=self.model,
+                    constraints=self.constraints,
+                    data_generator=data_generator)
+            )
+            self._callbacks['adaptive_weights'] = sci_callbacks[-1]
         elif 'adaptive_weights' in self._callbacks:
-            callbacks.append(self._callbacks['adaptive_weights'])
+            sci_callbacks.append(self._callbacks['adaptive_weights'])
 
         if adaptive_sample_weights:
             # sample_weights = [K.variable(wi) for wi in sample_weights]
-            callbacks.append(
+            sci_callbacks.append(
                 AdaptiveSampleWeight2(
                     self.model, data_generator=data_generator,
                     types=[type(v).__name__ for v in self.constraints],
@@ -524,71 +506,71 @@ class SciModel(object):
             )
             # loss_gradients = NTKSW.eval_diag_ntk()
             # sample_weights = NTKSW.eval_sample_weights(loss_gradients)
-            self._callbacks['adaptive_sample_weights'] = callbacks[-1]
+            self._callbacks['adaptive_sample_weights'] = sci_callbacks[-1]
 
         elif 'adaptive_sample_weights' in self._callbacks:
-            callbacks.append(self._callbacks['adaptive_sample_weights'])
+            sci_callbacks.append(self._callbacks['adaptive_sample_weights'])
 
         if log_loss_gradients:
             if not isinstance(log_loss_gradients, dict):
                 log_loss_gradients = LossGradientHistory.prepare_inputs(log_loss_gradients)
-            callbacks.append(
+            sci_callbacks.append(
                 LossGradientHistory(
                     self.model, data_generator=data_generator,
                     **log_loss_gradients
                 )
             )
-            self._callbacks['log_loss_gradients'] = callbacks[-1]
+            self._callbacks['log_loss_gradients'] = sci_callbacks[-1]
         elif 'log_loss_gradients' in self._callbacks:
-            callbacks.append(self._callbacks['log_loss_gradients'])
+            sci_callbacks.append(self._callbacks['log_loss_gradients'])
 
         if log_parameters:
             if not isinstance(log_parameters, dict):
                 log_parameters = ParameterHistory.prepare_inputs(log_parameters)
-            callbacks.append(
+            sci_callbacks.append(
                 ParameterHistory(**log_parameters)
             )
-            self._callbacks['log_parameters'] = callbacks[-1]
+            self._callbacks['log_parameters'] = sci_callbacks[-1]
         elif 'log_parameters' in self._callbacks:
-            callbacks.append(self._callbacks['log_parameters'])
+            sci_callbacks.append(self._callbacks['log_parameters'])
 
         if log_functionals:
             if not isinstance(log_functionals, dict):
                 log_functionals = FunctionalHistory.prepare_inputs(log_functionals)
-            callbacks.append(
+            sci_callbacks.append(
                 FunctionalHistory(**log_functionals)
             )
-            self._callbacks['log_functionals'] = callbacks[-1]
+            self._callbacks['log_functionals'] = sci_callbacks[-1]
         elif 'log_functionals' in self._callbacks:
-            callbacks.append(self._callbacks['log_functionals'])
+            sci_callbacks.append(self._callbacks['log_functionals'])
 
         if log_loss_landscape:
             if not isinstance(log_loss_landscape, dict):
                 log_loss_landscape = LossLandscapeHistory.prepare_inputs(log_loss_landscape)
-            callbacks.append(
+            sci_callbacks.append(
                 LossLandscapeHistory(
                     self.model, data_generator=data_generator,
                     **log_loss_landscape
                 )
             )
-            self._callbacks['log_loss_landscape'] = callbacks[-1]
+            self._callbacks['log_loss_landscape'] = sci_callbacks[-1]
         elif 'log_loss_landscape' in self._callbacks:
-            callbacks.append(self._callbacks['log_loss_landscape'])
+            sci_callbacks.append(self._callbacks['log_loss_landscape'])
 
         # training the models.
         history = opt_fit_func(
             data_generator,  # sums to number of samples.
             epochs=epochs,
-            callbacks=callbacks,
+            callbacks=sci_callbacks + to_list(callbacks),
             validation_data=validation_data,
             **kwargs
         )
 
-        if save_weights_to is not None:
+        if save_weights is not None:
             try:
-                self._model.save_weights("{}-end.hdf5".format(save_weights_to))
+                self._model.save_weights("{}-end.hdf5".format(save_weights_path))
             except:
-                print("\nWARNING: Failed to save model.weights to the provided path: {}\n".format(save_weights_to))
+                print("\nWARNING: Failed to save model.weights to the provided path: {}\n".format(save_weights_path))
 
         # return the history.
         return history
@@ -692,7 +674,10 @@ class SciModel(object):
             - "mse" for `Mean Squared Error` or
             - "mae" for `Mean Absolute Error` or
             - "se" for `Squared Error` or
-            - "ae" for `Absolute Error`.
+            - "ae" for `Absolute Error` or
+            - "sse" for `Squared Sum Error` or
+            - "ase" for `Absolute Sum Error` or
+            - "rse" for `Reduce Sum Error`.
 
         # Returns
             Callable function that gets (y_true, y_pred) as the input and
@@ -709,13 +694,18 @@ class SciModel(object):
             return lambda y_true, y_pred: K.sum(K.square(y_true - y_pred), axis=-1)
         elif method in ("ae", "absolute_error"):
             return lambda y_true, y_pred: K.sum(K.abs(y_true - y_pred), axis=-1)
+        elif method in ("sse", "squared_sum_error"):
+            return lambda y_true, y_pred: K.sum(K.square(K.sum(y_true - y_pred, axis=0, keepdims=True)), axis=-1)
+        elif method in ("ase", "absolute_sum_error"):
+            return lambda y_true, y_pred: K.sum(K.abs(K.sum(y_true - y_pred, axis=0, keepdims=True)), axis=-1)
+        elif method in ("rse", "reduce_sum_error"):
+            return lambda y_true, y_pred: K.sum(K.sum(y_true - y_pred, axis=0, keepdims=True), axis=-1)
         elif hasattr(k.losses, method):
             return getattr(k.losses, method)
         else:
             raise ValueError(
-                'Supported losses: Keras loss function or (mse, mae, se, ae)'
+                'Supported losses: Keras loss function or (mse, mae, se, ae, sse, ase, rse)'
             )
-
 
     @staticmethod
     def _prepare_data(cond_outputs, y_true, global_weights, num_sample, default_zero_weight):

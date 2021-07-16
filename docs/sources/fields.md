@@ -12,11 +12,11 @@ Fx = Field(name='Fx', units=10)
 
 ---
 
-<span style="float:right;">[[source]](https://github.com/sciann/sciann/tree/master/sciann/functionals/field.py#L13)</span>
+<span style="float:right;">[[source]](https://github.com/sciann/sciann/tree/master/sciann/functionals/field.py#L14)</span>
 ### Field
 
 ```python
-sciann.functionals.field.Field(name=None, units=1, activation=<function linear at 0x7fa42b187cb0>, kernel_initializer=<tensorflow.python.ops.init_ops.GlorotNormal object at 0x7fa42c614490>, bias_initializer=<tensorflow.python.keras.initializers.initializers_v1.RandomUniform object at 0x7fa3f85ce950>, kernel_regularizer=None, bias_regularizer=None, trainable=True, dtype=None)
+sciann.functionals.field.Field(name=None, units=1, activation=<function linear at 0x7f87707bc8b0>, kernel_initializer=None, bias_initializer=None, kernel_regularizer=None, bias_regularizer=None, trainable=True, use_bias=True, dtype=None)
 ```
 
 Configures the `Field` class for the model outputs.
@@ -38,6 +38,7 @@ __Arguments__
 - __bias_regularizer__: Regularizer for the bias.
     To set l1 and l2 to custom values, pass [l1, l2] or {'l1':l1, 'l2':l2}.
 - __trainable__: Boolean to activate parameters of the network.
+- __use_bias__: Boolean to add bias to the network.
 - __dtype__: data-type of the network parameters, can be
     ('float16', 'float32', 'float64').
 
