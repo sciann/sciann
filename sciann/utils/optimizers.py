@@ -144,7 +144,7 @@ class ScipyOptimizer(object):
 
     def __init__(self, model):
         self._model = model
-        self._layers = [layer for layer in model._layers if layer.weights]
+        self._layers = [layer for layer in model.layers if layer.weights]
         self._weights_size = 0
         for layer in self._layers:
             if layer.trainable:
