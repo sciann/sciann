@@ -42,20 +42,21 @@ def sci_exponential_decay(initial_learning_rate=1e-3,
                         final_learning_rate=1e-5,
                         decay_epochs=1000,
                         verify=False,
-                        name=None,
                         **kwargs):
     initial_learning_rate = lr0 = initial_learning_rate
     final_learning_rate = lr1 = final_learning_rate
     decay_epochs = decay_epochs
     decay_rate = np.log(lr1 / lr0) / (decay_epochs)
-    epoch_vals = np.linspace(0, decay_epochs, 200).astype(int)
+    epoch_vals = np.linspace(0, decay_epochs, 201)
     lr_vals = lr0 * np.exp(decay_rate * epoch_vals)
 
-    name = name
     if verify is True:
         plot_lr_schedule(epoch_vals, lr_vals)
 
-    func = interp1d(epoch_vals, lr_vals)
+    func = interp1d(epoch_vals, lr_vals,
+                    bounds_error=False,
+                    fill_value=(initial_learning_rate, final_learning_rate))
+
     return LearningRateSchedule(lambda i: float(func(i)))
 
 
@@ -92,7 +93,7 @@ def sci_sinusoidal_exponential_decay(
 
     th = np.arctan(decay_rate)
 
-    epoch_vals = np.linspace(0, decay_epochs, 200).astype(int)
+    epoch_vals = np.linspace(0, decay_epochs, 201)
     base_lr_vals = lr0 * np.exp(decay_rate * epoch_vals)
     decay_axis = epoch_vals * np.cos(th) + np.log(base_lr_vals / lr0) * np.sin(th)
     normalized_epoch_vals = 2 * np.pi * epoch_vals / epoch_vals.max()
@@ -103,7 +104,9 @@ def sci_sinusoidal_exponential_decay(
     if verify is True:
         plot_lr_schedule(epoch_vals, lr_vals)
 
-    func = interp1d(epoch_vals, lr_vals)
+    func = interp1d(epoch_vals, lr_vals,
+                    bounds_error=False,
+                    fill_value=(initial_learning_rate, final_learning_rate))
     return LearningRateSchedule(lambda i: float(func(i)))
 
 
@@ -111,7 +114,6 @@ def sci_sinusoidal_exponential_decay(
 Args:
     lr_epochs: list or numpy array of epochs at which learning rate values are given.
     lr_values: List or numpy array of learning rates.
-    name: String.  Optional name of the operation.  Defaults to
     'sci_learning_rate_schedule'.
     verify: Boolean. Plots the learning rate schedule.
 Returns:
@@ -123,10 +125,11 @@ def sci_learning_rate_schedule(
         lr_epochs=None,
         lr_values=None,
         verify=False,
-        name=None,
         **kwarg):
 
-    func = interp1d(lr_epochs, lr_values)
+    func = interp1d(lr_epochs, lr_values,
+                    bounds_error=False,
+                    fill_value=(lr_values[0], lr_values[-1]))
 
     if verify is True:
         plot_lr_schedule(lr_epochs, lr_values)
