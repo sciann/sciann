@@ -1,16 +1,7 @@
 # This code is taken from Keras .travis file. 
-dist: trusty
 language: python
-matrix:
-    include:
-        - python: 3.8
-          env: KERAS_BACKEND=tensorflow TEST_MODE=API
-#        - python: 3.8
-#          env: KERAS_BACKEND=tensorflow TEST_MODE=PEP8_DOC PIL=Pillow
-#        - python: 2.7
-#          env: KERAS_BACKEND=tensorflow
-#        - python: 3.6
-#          env: KERAS_BACKEND=tensorflow
+python: 
+  - "3.8"
 install:
   # code below is taken from http://conda.pydata.org/docs/travis.html
   # We do this conditionally because it saves us some downloading if the
@@ -20,6 +11,7 @@ install:
     else
       wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
     fi
+
   - bash miniconda.sh -b -p $HOME/miniconda
   - export PATH="$HOME/miniconda/bin:$PATH"
   - hash -r
@@ -31,36 +23,17 @@ install:
   - travis_retry conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
   - source activate test-environment
 
-  - travis_retry pip install --only-binary=numpy,scipy,pandas numpy nose scipy h5py pytest pytest-pep8 pandas --progress-bar off
+  - travis_retry pip install numpy nose scipy h5py pytest pytest-pep8 pandas mkdocs pydot graphviz tensorflow==2.4.0 --progress-bar off
 
   # set library path
   - export LD_LIBRARY_PATH=$HOME/miniconda/envs/test-environment/lib/:$LD_LIBRARY_PATH
 
-    # install pydot for visualization tests
-  - travis_retry conda install -q $MKL pydot graphviz $PIL
-
-  - pip install -e .[tests] --progress-bar off
-
-  # install TensorFlow (CPU version).
-  - pip install tensorflow==2.4.0 --progress-bar off
-
   # install Sciann.
-  - pip install sciann --progress-bar off
+  - pip install . --progress-bar off
 
   # install mkdocs
   - pip install mkdocs --progress-bar off
 
-  # install pyux
-  - pip install pyux
-
 # command to run tests
 script:
-  - export MKL_THREADING_LAYER="GNU"
-  # create dataset directory to avoid concurrent directory creation at runtime
-  # - mkdir ~/.sciann/datasets
-  # set up sciann backend
-  # - sed -i -e 's/"backend":[[:space:]]*"[^"]*/"backend":\ "'$KERAS_BACKEND'/g' ~/.sciann/sciann.json;
-  # - echo -e "Running tests with the following config:\n$(cat ~/.sciann/sciann.json)"
-  - if [[ "$TEST_MODE" == "API" ]]; then
-      PYTHONPATH=$PWD:$PYTHONPATH pip install git+git://github.com/sciann/sciann.git && python update_api.py && pip install -e .[tests] --progress-bar off && py.test tests/test_api.py;
-    fi
+  - py.test tests/test_api.py
