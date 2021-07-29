@@ -3,9 +3,9 @@ dist: trusty
 language: python
 matrix:
     include:
-        - python: 3.6
+        - python: 3.8
           env: KERAS_BACKEND=tensorflow TEST_MODE=API
-#        - python: 3.6
+#        - python: 3.8
 #          env: KERAS_BACKEND=tensorflow TEST_MODE=PEP8_DOC PIL=Pillow
 #        - python: 2.7
 #          env: KERAS_BACKEND=tensorflow
