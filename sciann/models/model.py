@@ -312,7 +312,7 @@ class SciModel(object):
                 . norm: defaulted to 2.
                 . resolution: defaulted to 10.
                 . path: Path to the location that the csv files will be logged.
-                . freq: Freq of logging the loss landscape.
+                . trials: Number of trials to pick a path.
             save_weights: (dict) Dict object expecting the following information:
                 . path: defaulted to the current path.
                 . freq: freq of calling CheckPoint callback.
@@ -454,7 +454,10 @@ class SciModel(object):
         model_file_path = None
         if save_weights is not None:
             assert isinstance(save_weights, dict), "pass a dictionary containing `path, freq, best`. "
-            save_weights_path = os.curdir() if 'path' not in save_weights.keys() else save_weights['path']
+            if 'path' not in save_weights.keys():
+                save_weights_path = os.path.join(os.curdir, "weights")
+            else:
+                save_weights_path = save_weights['path']
             try:
                 if 'best' in save_weights.keys() and \
                         save_weights['best'] is True:
@@ -567,10 +570,12 @@ class SciModel(object):
         )
 
         if save_weights is not None:
-            try:
-                self._model.save_weights("{}-end.hdf5".format(save_weights_path))
-            except:
-                print("\nWARNING: Failed to save model.weights to the provided path: {}\n".format(save_weights_path))
+            if 'best' not in save_weights.keys() or \
+                    save_weights['best'] is False:
+                try:
+                    self._model.save_weights("{}-end.hdf5".format(save_weights_path))
+                except:
+                    print("\nWARNING: Failed to save model.weights to the provided path: {}\n".format(save_weights_path))
 
         # return the history.
         return history

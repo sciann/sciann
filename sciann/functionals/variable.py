@@ -15,8 +15,6 @@ class Variable(MLPFunctional):
             Required as derivatives work only with layer names.
         units: Int.
             Number of feature of input var.
-        tensor: Tensorflow `Tensor`.
-            Can be pass as the input path.
         dtype: data-type of the network parameters, can be
             ('float16', 'float32', 'float64').
 
@@ -26,7 +24,6 @@ class Variable(MLPFunctional):
     def __init__(self,
                  name=None,
                  units=1,
-                 tensor=None,
                  dtype=None):
 
         if not dtype:
@@ -37,7 +34,6 @@ class Variable(MLPFunctional):
         layer = InputLayer(
             # batch_input_shape=(None, 1) if units == 1 else (None, units, 1),
             batch_input_shape=(None, units),
-            input_tensor=tensor,
             name=name,
             dtype=dtype
         )

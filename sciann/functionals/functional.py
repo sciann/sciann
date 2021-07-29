@@ -80,6 +80,8 @@ def Functional(
         hidden_layers = []
     else:
         hidden_layers = to_list(hidden_layers)
+    if not all([isinstance(n, int) for n in hidden_layers]):
+        raise TypeError("Enter a list of integers as the third input assigning layer widths, e.g. [10,10,10]. ")
     # prepare kernel initializers.
     activations, def_biasinit, def_kerinit = \
         prepare_default_activations_and_initializers(

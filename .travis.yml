@@ -42,10 +42,7 @@ install:
   - pip install -e .[tests] --progress-bar off
 
   # install TensorFlow (CPU version).
-  - pip install tensorflow==1.14.0 --progress-bar off
-
-  # install Keras.
-  - pip install keras==2.2.4 --progress-bar off
+  - pip install tensorflow==2.4.0 --progress-bar off
 
   # install Sciann.
   - pip install sciann --progress-bar off

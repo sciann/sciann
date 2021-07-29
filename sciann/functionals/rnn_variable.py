@@ -17,8 +17,6 @@ class RNNVariable(RNNFunctional):
             A minimum of 2 is needed.
         name: String.
             Required as derivatives work only with layer names.
-        tensor: Tensorflow `Tensor`.
-            Can be pass as the input path.
         dtype: data-type of the network parameters, can be
             ('float16', 'float32', 'float64').
 
@@ -28,7 +26,6 @@ class RNNVariable(RNNFunctional):
     def __init__(self,
                  units,
                  name=None,
-                 tensor=None,
                  dtype=None):
 
         if not dtype:
@@ -41,7 +38,6 @@ class RNNVariable(RNNFunctional):
 
         layer = InputLayer(
             batch_input_shape=(None, units, 1),
-            input_tensor=tensor,
             name=name,
             dtype=dtype
         )

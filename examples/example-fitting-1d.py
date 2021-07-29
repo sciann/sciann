@@ -43,9 +43,13 @@ model.summary()
 # Training: .train runs the optimization and finds the parameters.
 model.train(x_true,
             [y_true],
-            learning_rate={"scheduler":"SineExponentialDecay", "verify": True},
+            epochs=100,
+            learning_rate={"scheduler": "ExponentialDecay",
+                           "initial_learning_rate": 1e-3,
+                           "final_learning_rate": 1e-5,
+                           "decay_epochs": 10,
+                           "verify": True},
             batch_size=32,
-            epochs=2,
             adaptive_weights={'method': "NTK", 'freq': 10, "use_score": True, "alpha": 1.}
             )
 

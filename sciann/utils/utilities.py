@@ -219,7 +219,7 @@ def prepare_default_activations_and_initializers(actfs, seed=None):
                 lay_actf = sig.__name__.lower().split('-')
                 f = sig
             else:
-                raise ValueError('expected a string for actf: {}'.format(sig))
+                raise TypeError('expected a string for actf: {}'.format(sig))
             if len(lay_actf) == 2:
                 append_to_bib("jagtap2020locally")
                 layer_actfs.append(SciActivationLayer(w, f, lay_actf[0]))
