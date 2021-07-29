@@ -1,4 +1,5 @@
 [![PyPI Version](https://badge.fury.io/py/SciANN.svg)](https://badge.fury.io/py/SciANN)
+[![Build Status](https://travis-ci.com/ehsanhaghighat/sciann.svg?branch=master)](https://www.travis-ci.com/ehsanhaghighat/sciann)
 [![Downloads](https://pepy.tech/badge/sciann)](https://pepy.tech/project/sciann)
 [![Downloads](https://pepy.tech/badge/sciann/month)](https://pepy.tech/project/sciann)
 [![Downloads](https://pepy.tech/badge/sciann/week)](https://pepy.tech/project/sciann)
