@@ -1,39 +1,12 @@
-# This code is taken from Keras .travis file. 
 language: python
 python: 
+  - "3.6"
+  - "3.7"
   - "3.8"
+
 install:
-  # code below is taken from http://conda.pydata.org/docs/travis.html
-  # We do this conditionally because it saves us some downloading if the
-  # version is the same.
-  - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
-      wget https://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh;
-    else
-      wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
-    fi
+  - pip install -r requirements.txt
+  - pip install . 
 
-  - bash miniconda.sh -b -p $HOME/miniconda
-  - export PATH="$HOME/miniconda/bin:$PATH"
-  - hash -r
-  - conda config --set always_yes yes --set changeps1 no
-  - conda update -q conda
-  # Useful for debugging any issues with conda
-  - conda info -a
-
-  - travis_retry conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
-  - source activate test-environment
-
-  - travis_retry pip install numpy nose scipy h5py pytest pytest-pep8 pandas mkdocs pydot graphviz tensorflow==2.4.0 --progress-bar off
-
-  # set library path
-  - export LD_LIBRARY_PATH=$HOME/miniconda/envs/test-environment/lib/:$LD_LIBRARY_PATH
-
-  # install Sciann.
-  - pip install . --progress-bar off
-
-  # install mkdocs
-  - pip install mkdocs --progress-bar off
-
-# command to run tests
 script:
-  - py.test tests/test_api.py
+  - pytest -v tests/
