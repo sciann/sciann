@@ -1,5 +1,5 @@
 [![PyPI Version](https://badge.fury.io/py/SciANN.svg)](https://badge.fury.io/py/SciANN)
-[![Build Status](https://github.com/sciann/sciann/actions/workflows/github-action/badge.svg)](https://github.com/sciann/sciann/actions/workflows/github-action/badge.svg)
+[![Build Status](https://github.com/sciann/sciann/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/sciann/sciann/actions/workflows/build.yml/badge.svg?branch=master)
 [![Downloads](https://pepy.tech/badge/sciann)](https://pepy.tech/project/sciann)
 [![Downloads](https://pepy.tech/badge/sciann/month)](https://pepy.tech/project/sciann)
 [![Downloads](https://pepy.tech/badge/sciann/week)](https://pepy.tech/project/sciann)
