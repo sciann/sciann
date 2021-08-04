@@ -88,7 +88,10 @@ class MLPFunctional(object):
             
             (Xs):
                 Evaluates the functional object from inputs of the functional. 
-                    Xs should match those of inputs to the functional. 
+                    Xs should match those of inputs to the functional.
+
+            (Xs):
+                A dictionary, containing values for each variable.
                     
         # Returns
             Numpy array of dimensions of network outputs. 
@@ -113,15 +116,21 @@ class MLPFunctional(object):
             raise NotImplemented()
 
         # To have unified output for postprocessing - limitted support.
-        xs = to_list(xs)
-        shape_default = [x.shape for x in xs]
+        if not isinstance(xs, dict):
+            xs = to_list(xs)
+            assert len(model.inputs) == len(xs), \
+                'Number of inputs do not match the number of inputs to the functional. '
+            xs = {v.name: x for v, x in zip(model.inputs, to_list(xs))}
+
+        shape_default = [x.shape for x in xs.values()]
         assert all([shape_default[0][0]==x[0] for x in shape_default[1:]])
+
         # prepare X,Y data.
         for i, (x, xt) in enumerate(zip(xs, model.inputs)):
             x_shape = tuple(xt.get_shape().as_list())
-            if x.shape != x_shape:
+            if xs[x].shape[1:] != x_shape[1:]:
                 try:
-                    xs[i] = x.reshape((-1,) + x_shape[1:])
+                    xs[x] = xs[x].reshape((-1,) + x_shape[1:])
                 except:
                     print(
                         'Could not automatically convert the inputs to be ' 
@@ -138,11 +147,6 @@ class MLPFunctional(object):
                 y_pred = [y.reshape(shape_default[0]) for y in y_pred]
             except:
                 print("Input and output dimensions need re-adjustment for post-processing.")
-
-        # revert back to normal.
-        for i, sd in enumerate(shape_default):
-            xs[i] = xs[i].reshape(sd)
-        xs = unpack_singleton(xs)
 
         return unpack_singleton(y_pred)
 

@@ -78,6 +78,10 @@ def test_data_xy():
     return list(np.meshgrid(x, y))
 
 @pytest.fixture
+def test_data_xy_dict(test_data_xy):
+    return {'x': test_data_xy[0], 'y': test_data_xy[1]}
+
+@pytest.fixture
 def expected_hxy(test_data_xy):
     return 10*np.tanh(10*np.tanh(test_data_xy[0] + test_data_xy[1]))
 
@@ -199,9 +203,15 @@ def test_scimodel_lossfunc_exceptions(variable_x, variable_y, functional_fx, fun
     with pytest.raises(ValueError):
         assert isinstance(sn.SciModel(xs, ys, "to_fail", "adam"), sn.SciModel)
 
-def test_eval_functional(expected_hxy, test_data_xy, functional_hxy):
+def test_eval_functional(expected_hxy, test_data_xy, test_data_xy_dict, functional_hxy):
+    # 1. Test with list input
     hxy_test = functional_hxy.eval(test_data_xy)
-    assert np.linalg.norm(hxy_test - expected_hxy) < 1e-6*np.linalg.norm(expected_hxy)
+    assert np.linalg.norm(hxy_test - expected_hxy) < 1e-6*np.linalg.norm(expected_hxy), \
+        'test_eval_functional: failed using list inputs. '
+    # 2. Test with dict input
+    hxy_test = functional_hxy.eval(test_data_xy_dict)
+    assert np.linalg.norm(hxy_test - expected_hxy) < 1e-6 * np.linalg.norm(expected_hxy), \
+        'test_eval_functional: failed using dict inputs. '
 
 def test_eval_diff(expected_diff_hxy, test_data_xy, functional_hxy_diffs):
     diff_test = [f.eval(test_data_xy) for f in functional_hxy_diffs]
@@ -313,3 +323,7 @@ def test_train_adaptive_weights_neural_tangent_kernel(train_data_fx_gx, test_dat
         train_data_fx_gx[0], train_data_fx_gx[1], epochs=10,
         adaptive_weights={"method": "NTK", "freq": 5, "alpha": 1.}
     )
+
+
+if __name__ == '__main__':
+    pytest.main(['--verbose'])
