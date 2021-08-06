@@ -68,6 +68,7 @@ examples/example-fitting-1d-rnn.py
 examples/example-fitting-1d.py
 examples/example-fitting-fourier.py
 examples/test_diff.py
+examples/__pycache__/test_diff.cpython-38-pytest-6.2.2.pyc
 sciann/__init__.py
 sciann/constraints/__init__.py
 sciann/constraints/constraint.py

@@ -14,6 +14,7 @@ from tensorflow.python.keras.layers import Concatenate
 from tensorflow.python.keras.layers import Lambda
 from tensorflow.python.keras.models import Model
 from tensorflow import tensordot, expand_dims
+import numpy as np
 
 from ..utils import to_list, unpack_singleton, is_same_tensor, unique_tensors
 from ..utils import default_weight_initializer
@@ -116,21 +117,35 @@ class MLPFunctional(object):
             raise NotImplemented()
 
         # To have unified output for postprocessing - limitted support.
-        if not isinstance(xs, dict):
-            xs = to_list(xs)
-            assert len(model.inputs) == len(xs), \
+        if isinstance(xs, dict):
+            xs_names = []
+            xs_vals = []
+            for x_in in model.inputs:
+                x_names = [x_in.name, x_in.name.split(':')[0]]
+                if x_names[0] in xs.keys():
+                    xs_vals.append(xs[x_names[0]])
+                    xs_names.append(x_names[0])
+                elif x_names[1] in xs.keys():
+                    xs_vals.append(xs[x_names[1]])
+                    xs_names.append(x_names[1])
+                else:
+                    raise ValueError(f'Cannot map network input node {x_names[0]} to the input dict with {xs.keys()}. ')
+        elif isinstance(xs, np.ndarray) or isinstance(xs, list):
+            xs_vals = to_list(xs)
+            assert len(model.inputs) == len(xs_vals), \
                 'Number of inputs do not match the number of inputs to the functional. '
-            xs = {v.name: x for v, x in zip(model.inputs, to_list(xs))}
+        else:
+            raise TypeError('Expected a list of `np.ndarray` inputs.')
 
-        shape_default = [x.shape for x in xs.values()]
-        assert all([shape_default[0][0]==x[0] for x in shape_default[1:]])
+        shape_default = [x.shape for x in xs_vals]
+        assert all([shape_default[0][0] == x[0] for x in shape_default[1:]])
 
         # prepare X,Y data.
-        for i, (x, xt) in enumerate(zip(xs, model.inputs)):
+        for i, (x, xt) in enumerate(zip(xs_vals, model.inputs)):
             x_shape = tuple(xt.get_shape().as_list())
-            if xs[x].shape[1:] != x_shape[1:]:
+            if x.shape[1:] != x_shape[1:]:
                 try:
-                    xs[x] = xs[x].reshape((-1,) + x_shape[1:])
+                    xs_vals[i] = xs_vals[i].reshape((-1,) + x_shape[1:])
                 except:
                     print(
                         'Could not automatically convert the inputs to be ' 
@@ -139,7 +154,15 @@ class MLPFunctional(object):
                     )
                     assert False
 
-        y_pred = to_list(model(xs))
+        y_pred = to_list(model(xs_vals))
+
+        # revert back to normal.
+        # if isinstance(xs, dict):
+        #     for i, (xn, xv) in enumerate(zip(xs_names, xs_vals)):
+        #         xs[xn] = xv.reshpae(shape_default[i])
+        if isinstance(xs, list):
+            for i, x in enumerate(xs):
+                xs[i] = x.reshape(shape_default[i])
         
         # return uniform shapes. 
         if all([shape_default[0]==sd for sd in shape_default[1:]]):
