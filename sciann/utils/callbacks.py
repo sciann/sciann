@@ -77,7 +77,9 @@ class GradientPathologyLossWeight(Callback):
     def __init__(self, model, data_generator,
                  beta=0.1, freq=100, log_freq=None,
                  types=None,
-                 alpha=0.0, **kwargs):
+                 alpha=0.0,
+                 min_max=None,
+                 **kwargs):
         super(GradientPathologyLossWeight, self).__init__()
         append_to_bib(["wang2020gp"])
         # generate samples. 
@@ -113,6 +115,11 @@ class GradientPathologyLossWeight(Callback):
             self.base_losses = [1. if li==0. else li for li in self.eval_losses()]
         else:
             self.base_losses = None
+        if min_max is None:
+            self.min_max = [-np.Inf, np.Inf]
+        else:
+            assert len(min_max)==2
+            self.min_max = min_max
 
     def on_epoch_begin(self, epoch, logs={}):
         if epoch % self.freq == 0:
@@ -203,6 +210,13 @@ class GradientPathologyLossWeight(Callback):
 
         old_weights = [K.get_value(wi) for wi in self.model.loss_weights]
         gp_weights = [new_weights[i]/old_weights[i]*new_scores[i] for i in range(n_task)]
+        # check for limiting weights.
+        for i, wi in enumerate(gp_weights):
+            if wi < self.min_max[0]:
+                gp_weights[i] = self.min_max[0]
+            elif wi > self.min_max[1]:
+                gp_weights[i] = self.min_max[1]
+        # normalizing weights.
         norm = len(gp_weights)/sum(gp_weights)
         gp_weights = [gpi*norm for gpi in gp_weights]
 
@@ -234,7 +248,7 @@ class GradNormLossWeight(Callback):
     """
     def __init__(self, model, data_generator,
                  beta=0.1, freq=100, log_freq=None, types=None,
-                 alpha=0.0, **kwargs):
+                 alpha=0.0, min_max=None, **kwargs):
         super(GradNormLossWeight, self).__init__()
         append_to_bib("chen2018gradnorm")
         # generate samples.
@@ -266,6 +280,11 @@ class GradNormLossWeight(Callback):
             self.base_losses = [1. if li == 0. else li for li in self.eval_losses()]
         else:
             self.base_losses = None
+        if min_max is None:
+            self.min_max = [-np.Inf, np.Inf]
+        else:
+            assert len(min_max) == 2
+            self.min_max = min_max
 
     def on_epoch_begin(self, epoch, logs={}):
         if epoch % self.freq == 0:
@@ -332,7 +351,16 @@ class GradNormLossWeight(Callback):
 
         old_weights = [K.get_value(wi) for wi in self.model.loss_weights]
         gp_weights = [new_weights[i] * new_scores[i] for i in range(n_task)]
-        norm = 1.0 #len(gp_weights) / sum(gp_weights)
+
+        # check for limiting weights.
+        for i, wi in enumerate(gp_weights):
+            if wi < self.min_max[0]:
+                gp_weights[i] = self.min_max[0]
+            elif wi > self.min_max[1]:
+                gp_weights[i] = self.min_max[1]
+
+        # normalizing weights.
+        norm = len(gp_weights) / sum(gp_weights)
         gp_weights = [gpi * norm for gpi in gp_weights]
 
         self.loss_weights = []
@@ -365,7 +393,7 @@ class InverseDirichletLossWeight(Callback):
     def __init__(self, model, data_generator,
                  beta=0.5, freq=100, log_freq=None,
                  hessian=False, types=None,
-                 alpha=0.0, **kwargs):
+                 alpha=0.0, min_max=None, **kwargs):
         super(InverseDirichletLossWeight, self).__init__()
         append_to_bib(["maddu2021inversedirichlet"])
         # generate samples.
@@ -404,6 +432,11 @@ class InverseDirichletLossWeight(Callback):
             self.base_losses = [1. if li==0. else li for li in self.eval_losses()]
         else:
             self.base_losses = None
+        if min_max is None:
+            self.min_max = [-np.Inf, np.Inf]
+        else:
+            assert len(min_max) == 2
+            self.min_max = min_max
 
     def on_epoch_begin(self, epoch, logs={}):
         if epoch % self.freq == 0:
@@ -466,6 +499,13 @@ class InverseDirichletLossWeight(Callback):
 
         old_weights = [K.get_value(wi) for wi in self.model.loss_weights]
         gp_weights = [new_weights[i] * new_scores[i] for i in range(n_task)]
+        # check for limiting weights.
+        for i, wi in enumerate(gp_weights):
+            if wi < self.min_max[0]:
+                gp_weights[i] = self.min_max[0]
+            elif wi > self.min_max[1]:
+                gp_weights[i] = self.min_max[1]
+        # normalizing weights.
         norm = len(gp_weights) / sum(gp_weights)
         gp_weights = [gpi * norm for gpi in gp_weights]
 
@@ -689,7 +729,7 @@ class ScoreLossWeight(Callback):
     """
 
     def __init__(self, model, data_generator, freq=100, 
-                 alpha=1., beta=0.1, **kwargs):
+                 alpha=1., beta=0.1, min_max=None, **kwargs):
         super(ScoreLossWeight, self).__init__()
         # generate samples.
         self.inputs, self.targets, self.weights = data_generator[0]
@@ -708,6 +748,11 @@ class ScoreLossWeight(Callback):
         self.alpha = alpha
         self.beta = beta
         self.base_losses = [1. if li == 0. else li for li in self.eval_losses()]
+        if min_max is None:
+            self.min_max = [-np.Inf, np.Inf]
+        else:
+            assert len(min_max) == 2
+            self.min_max = min_max
 
     def on_epoch_begin(self, epoch, logs={}):
         # pass
@@ -719,6 +764,13 @@ class ScoreLossWeight(Callback):
             scores = [(li/np.mean(scores))**self.alpha for li in scores]
             norm = n_task/sum(scores)
             new_weights = [si*norm for si in scores]
+
+            # check for limiting weights.
+            for i, wi in enumerate(new_weights):
+                if wi < self.min_max[0]:
+                    new_weights[i] = self.min_max[0]
+                elif wi > self.min_max[1]:
+                    new_weights[i] = self.min_max[1]
 
             old_weights = [K.get_value(wi) for wi in self.model.loss_weights]
             
@@ -959,7 +1011,7 @@ class NTKLossWeight(Callback):
     """
     def __init__(self, model, data_generator,
                  beta=0.9, freq=100, log_freq=None,
-                 alpha=0., types=None, **kwargs):
+                 alpha=0., types=None, min_max=None, **kwargs):
         super(NTKLossWeight, self).__init__()
         append_to_bib("wang2020ntk")
         # generate samples.
@@ -994,6 +1046,11 @@ class NTKLossWeight(Callback):
             self.base_losses = [1. if li==0. else li for li in self.eval_losses()]
         else:
             self.base_losses = None
+        if min_max is None:
+            self.min_max = [-np.Inf, np.Inf]
+        else:
+            assert len(min_max) == 2
+            self.min_max = min_max
 
     @staticmethod
     def collect_weights(model):
@@ -1075,6 +1132,12 @@ class NTKLossWeight(Callback):
             new_weights = self.eval_loss_weights(updated_grads)
         else:
             new_weights = self.eval_scored_loss_weights(updated_grads, updated_losses)
+        # check for limiting weights.
+        for i, wi in enumerate(new_weights):
+            if wi < self.min_max[0]:
+                new_weights[i] = self.min_max[0]
+            elif wi > self.min_max[1]:
+                new_weights[i] = self.min_max[1]
         # normalization
         weight_normalization = len(new_weights) / sum(new_weights)
         self.loss_weights = []
