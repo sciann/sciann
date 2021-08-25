@@ -31,6 +31,8 @@ Args:
         Defaults to 1e-5.
     decay_epochs: number of epochs, over which the exponential decay is applied.
         Defaults to 1000.
+    delay_epochs: number of epochs, over which the initial learning rate is used.
+        Defaults to 0 (No delay). 
     verify: Boolean. Plots the learning rate schedule.
 
 Returns:
@@ -39,16 +41,22 @@ Returns:
     type as `initial_learning_rate`.
 """
 def sci_exponential_decay(initial_learning_rate=1e-3,
-                        final_learning_rate=1e-5,
-                        decay_epochs=1000,
-                        verify=False,
-                        **kwargs):
+                          final_learning_rate=1e-5,
+                          decay_epochs=1000,
+                          delay_epochs=0,
+                          verify=False,
+                          **kwargs):
     initial_learning_rate = lr0 = initial_learning_rate
     final_learning_rate = lr1 = final_learning_rate
     decay_epochs = decay_epochs
     decay_rate = np.log(lr1 / lr0) / (decay_epochs)
     epoch_vals = np.linspace(0, decay_epochs, 201)
     lr_vals = lr0 * np.exp(decay_rate * epoch_vals)
+    
+    # account for delay. 
+    if delay_epochs > 0:
+        epoch_vals = np.concatenate([[0, delay_epochs], epoch_vals+delay_epochs])
+        lr_vals = np.concatenate([[initial_learning_rate, initial_learning_rate], lr_vals])
 
     if verify is True:
         plot_lr_schedule(epoch_vals, lr_vals)
@@ -68,6 +76,8 @@ Args:
         Defaults to 1e-5.
     decay_epochs: number of epochs, over which the exponential decay is applied.
         Defaults to 1000.
+    delay_epochs: number of epochs, over which the initial learning rate is used.
+        Defaults to 0 (No delay). 
     sine_freq: number of sinusoidal oscillations in learning rate.
         defaults to 10.
     sine_decay_rate: exponential decay on the amplitude of sin wave.
@@ -82,6 +92,7 @@ def sci_sinusoidal_exponential_decay(
         initial_learning_rate=1e-3,
         final_learning_rate=1e-5,
         decay_epochs=1000,
+        delay_epochs=0,
         sine_freq=10,
         sine_decay_rate=0.5,
         verify=False,
@@ -100,6 +111,11 @@ def sci_sinusoidal_exponential_decay(
     sin_lr_vals = np.exp(-sine_decay_rate * normalized_epoch_vals) * \
                   np.sin(-sine_freq * normalized_epoch_vals)
     lr_vals = lr0 * np.exp(decay_axis * np.sin(th) + sin_lr_vals * np.cos(th))
+
+    # account for delay. 
+    if delay_epochs > 0:
+        epoch_vals = np.concatenate([[0, delay_epochs], epoch_vals+delay_epochs])
+        lr_vals = np.concatenate([[initial_learning_rate, initial_learning_rate], lr_vals])
 
     if verify is True:
         plot_lr_schedule(epoch_vals, lr_vals)

@@ -5,7 +5,7 @@ pyyaml
 h5py
 sklearn
 pybtex
-tensorflow>=2.1.0
+tensorflow<2.6,>=2.1.0
 
 [tests]
 pytest
