@@ -6,46 +6,39 @@ from __future__ import division
 from __future__ import print_function
 
 from tensorflow.keras.callbacks import LearningRateScheduler as LearningRateSchedule
-# from tensorflow.keras.optimizers.schedules import LearningRateSchedule
 from tensorflow.keras.callbacks import ReduceLROnPlateau
-from tensorflow.python.util.tf_export import keras_export
 import numpy as np
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 
-from tensorflow.python.framework import ops
-from tensorflow.python.keras.utils import generic_utils
-from tensorflow.python.ops import control_flow_ops
-from tensorflow.python.ops import math_ops
 
-
-"""Applies exponential decay to the learning rate.
-Example:
-``` python
-    sci_exponential_decay(1e-3, 1e-5, 10000)
-```
-Args:
-    initial_learning_rate: The initial learning rate.
-        Defaults to 1e-3.
-    final_learning_rate: The final learning rate.
-        Defaults to 1e-5.
-    decay_epochs: number of epochs, over which the exponential decay is applied.
-        Defaults to 1000.
-    delay_epochs: number of epochs, over which the initial learning rate is used.
-        Defaults to 0 (No delay). 
-    verify: Boolean. Plots the learning rate schedule.
-
-Returns:
-    A 1-arg callable learning rate schedule that takes the current optimizer
-    step and outputs the decayed learning rate, a scalar `Tensor` of the same
-    type as `initial_learning_rate`.
-"""
 def sci_exponential_decay(initial_learning_rate=1e-3,
                           final_learning_rate=1e-5,
                           decay_epochs=1000,
                           delay_epochs=0,
                           verify=False,
-                          **kwargs):
+                          scheduler="exponential_decay"):
+    """Applies exponential decay to the learning rate.
+    Example:
+    ``` python
+        sci_exponential_decay(1e-3, 1e-5, 10000)
+    ```
+    Args:
+        initial_learning_rate: The initial learning rate.
+            Defaults to 1e-3.
+        final_learning_rate: The final learning rate.
+            Defaults to 1e-5.
+        decay_epochs: number of epochs, over which the exponential decay is applied.
+            Defaults to 1000.
+        delay_epochs: number of epochs, over which the initial learning rate is used.
+            Defaults to 0 (No delay).
+        verify: Boolean. Plots the learning rate schedule.
+
+    Returns:
+        A 1-arg callable learning rate schedule that takes the current optimizer
+        step and outputs the decayed learning rate, a scalar `Tensor` of the same
+        type as `initial_learning_rate`.
+    """
     initial_learning_rate = lr0 = initial_learning_rate
     final_learning_rate = lr1 = final_learning_rate
     decay_epochs = decay_epochs
@@ -68,26 +61,6 @@ def sci_exponential_decay(initial_learning_rate=1e-3,
     return LearningRateSchedule(lambda i: float(func(i)))
 
 
-"""Applies exponential decay to the learning rate.
-Args:
-    initial_learning_rate: The initial learning rate.
-        Defaults to 1e-3.
-    final_learning_rate: The final learning rate.
-        Defaults to 1e-5.
-    decay_epochs: number of epochs, over which the exponential decay is applied.
-        Defaults to 1000.
-    delay_epochs: number of epochs, over which the initial learning rate is used.
-        Defaults to 0 (No delay). 
-    sine_freq: number of sinusoidal oscillations in learning rate.
-        defaults to 10.
-    sine_decay_rate: exponential decay on the amplitude of sin wave.
-        defaults to 0.5.
-    verify: Boolean. Plots the learning rate schedule.
-Returns:
-    A 1-arg callable learning rate schedule that takes the current optimizer
-    step and outputs the decayed learning rate, a scalar `Tensor` of the same
-    type as `initial_learning_rate`.
-"""
 def sci_sinusoidal_exponential_decay(
         initial_learning_rate=1e-3,
         final_learning_rate=1e-5,
@@ -96,8 +69,27 @@ def sci_sinusoidal_exponential_decay(
         sine_freq=10,
         sine_decay_rate=0.5,
         verify=False,
-        **kwarg):
-
+        scheduler="sinusoidal_exponential_decay"):
+    """Applies exponential decay to the learning rate.
+    Args:
+        initial_learning_rate: The initial learning rate.
+            Defaults to 1e-3.
+        final_learning_rate: The final learning rate.
+            Defaults to 1e-5.
+        decay_epochs: number of epochs, over which the exponential decay is applied.
+            Defaults to 1000.
+        delay_epochs: number of epochs, over which the initial learning rate is used.
+            Defaults to 0 (No delay).
+        sine_freq: number of sinusoidal oscillations in learning rate.
+            defaults to 10.
+        sine_decay_rate: exponential decay on the amplitude of sin wave.
+            defaults to 0.5.
+        verify: Boolean. Plots the learning rate schedule.
+    Returns:
+        A 1-arg callable learning rate schedule that takes the current optimizer
+        step and outputs the decayed learning rate, a scalar `Tensor` of the same
+        type as `initial_learning_rate`.
+    """
     lr0 = initial_learning_rate
     lr1 = final_learning_rate
     decay_rate = np.log(lr1 / lr0) / (decay_epochs)
@@ -126,23 +118,22 @@ def sci_sinusoidal_exponential_decay(
     return LearningRateSchedule(lambda i: float(func(i)))
 
 
-"""uses discrete values to schedule the learning rate.
-Args:
-    lr_epochs: list or numpy array of epochs at which learning rate values are given.
-    lr_values: List or numpy array of learning rates.
-    'sci_learning_rate_schedule'.
-    verify: Boolean. Plots the learning rate schedule.
-Returns:
-    A 1-arg callable learning rate schedule that takes the current optimizer
-    step and outputs the decayed learning rate, a scalar `Tensor` of the same
-    type as `initial_learning_rate`.
-"""
 def sci_learning_rate_schedule(
         lr_epochs=None,
         lr_values=None,
         verify=False,
-        **kwarg):
-
+        scheduler="learning_rate_schedule"):
+    """uses discrete values to schedule the learning rate.
+    Args:
+        lr_epochs: list or numpy array of epochs at which learning rate values are given.
+        lr_values: List or numpy array of learning rates.
+        'sci_learning_rate_schedule'.
+        verify: Boolean. Plots the learning rate schedule.
+    Returns:
+        A 1-arg callable learning rate schedule that takes the current optimizer
+        step and outputs the decayed learning rate, a scalar `Tensor` of the same
+        type as `initial_learning_rate`.
+    """
     func = interp1d(lr_epochs, lr_values,
                     bounds_error=False,
                     fill_value=(lr_values[0], lr_values[-1]))
@@ -158,25 +149,25 @@ def setup_lr_scheduler(learning_rate_scheduler):
         'Expecting a dictionary describing the scheduler. '
     if 'scheduler' in learning_rate_scheduler.keys():
         if learning_rate_scheduler['scheduler'].lower() in \
-                ('ed', 'exponential_decay', 'exponentialdecay'):
+                alternative_names(["exponential", "decay"]):
             try:
                 return sci_exponential_decay(**learning_rate_scheduler)
             except:
-                print(sci_exponential_decay.__doc__)
+                help(sci_exponential_decay)
                 raise ValueError('Inconsistent inputs for `sci_exponential_decay`.')
         elif learning_rate_scheduler['scheduler'].lower() in \
-                ('sed', 'sine_exponential_decay', 'sineexponentialdecay'):
+                alternative_names(["sine", "exponential", "decay"]):
             try:
                 return sci_sinusoidal_exponential_decay(**learning_rate_scheduler)
             except:
-                print(sci_sinusoidal_exponential_decay.__doc__)
+                help(sci_sinusoidal_exponential_decay)
                 raise ValueError('Inconsistent inputs for `sci_sinusoidal_exponential_decay`.')
         elif learning_rate_scheduler['scheduler'].lower() in \
-                ('lrs', 'learning_rate_scheduler', 'learningratescheduler'):
+                alternative_names(["learning", "rate", "scheduler"]):
             try:
-                return sci_learning_rate_schedule(*learning_rate_scheduler)
+                return sci_learning_rate_schedule(**learning_rate_scheduler)
             except:
-                print(sci_learning_rate_schedule.__doc__)
+                help(sci_learning_rate_schedule)
                 raise ValueError('Inconsistent inputs for `sci_learning_rate_schedule`.')
         elif learning_rate_scheduler['scheduler'].lower() in ('default',):
             try:
@@ -198,12 +189,23 @@ def setup_lr_scheduler(learning_rate_scheduler):
         raise ValueError('`scheduler` not found in the dictionary. ')
 
 
-""" Plotting (epochs, lr) for debugging purposes. 
-Args:
-    epochs: list or numpy array of epochs at which learning rate values are given.
-    lrs: List or numpy array of learning rates.
-"""
+def alternative_names(name):
+    assert isinstance(name, list)
+    assert all([isinstance(v, str) for v in name])
+    alts = [
+        "".join(name).lower(),
+        "_".join(name).lower(),
+        "".join([v[0] for v in name]).lower(),
+    ]
+    return alts
+
+
 def plot_lr_schedule(epochs, lrs):
+    """ Plotting (epochs, lr) for debugging purposes.
+    Args:
+        epochs: list or numpy array of epochs at which learning rate values are given.
+        lrs: List or numpy array of learning rates.
+    """
     fig, ax = plt.subplots(1, 2, figsize=(10, 4))
     ax[0].plot(epochs, lrs)
     ax[0].set_xlabel("epochs")

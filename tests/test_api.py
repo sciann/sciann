@@ -283,10 +283,18 @@ def test_train_learning_rate(train_data_fx, model_fx):
 
 def test_train_learning_rate_expscheduler(train_data_fx, model_fx):
     h = model_fx.train(
+        train_data_fx[0], train_data_fx[1], epochs=10,
+        learning_rate = ([0, 100], [0.001, 0.0001])
+    )
+
+
+def test_train_learning_rate_expscheduler(train_data_fx, model_fx):
+    h = model_fx.train(
         train_data_fx[0], train_data_fx[1], epochs=10, 
         learning_rate = {"scheduler": "exponentialdecay", 
                          "initial_learning_rate": 0.001, 
-                         "final_learning_rate":0.0001}
+                         "final_learning_rate":0.0001,
+                         "decay_epochs": 100}
     )
 
 
@@ -296,6 +304,7 @@ def test_train_learning_rate_sinescheduler(train_data_fx, model_fx):
         learning_rate = {"scheduler": "sineexponentialdecay", 
                          "initial_learning_rate": 0.001, 
                          "final_learning_rate":0.0001,
+                         "decay_epochs": 100,
                          "sine_freq": 2,
                          "sine_decay_rate": 0.5}
     )

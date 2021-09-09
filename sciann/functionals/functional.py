@@ -131,7 +131,7 @@ def Functional(
                 )
             )
         elif validations.is_field(fld):
-            output_fields.append(fields)
+            output_fields.append(fld)
         else:
             raise TypeError(
                 'Please provide a "list" of field names of'

@@ -28,6 +28,11 @@ from .utils.utilities import set_random_seed
 from .utils.utilities import set_floatx
 from .utils.utilities import get_bibliography
 
+import json
+from urllib import request
+from pkg_resources import parse_version
+
+
 # SciANN.
 __author__ = "Ehsan Haghighat"
 __email__ = "ehsanh@mit.edu"
@@ -35,7 +40,7 @@ __copyright__ = "Copyright 2019, Physics-Informed Deep Learning"
 __credits__ = []
 __url__ = "http://github.com/sciann/sciann]"
 __license__ = "MIT"
-__version__ = "0.6.4.7"
+__version__ = "0.6.5.0"
 __cite__ = \
     '@article{haghighat2021sciann, \n' +\
     '    title={SciANN: A Keras/TensorFlow wrapper for scientific computations and physics-informed deep learning using artificial neural networks}, \n' +\
@@ -75,3 +80,15 @@ else:
 # set default logging directory.
 set_default_log_path(os.path.join(os.getcwd(), "logs"))
 initialize_bib(os.path.join(os.path.dirname(__file__), 'references', 'bibliography'))
+
+# check sciann version.
+try:
+    url = 'https://pypi.python.org/pypi/sciann/json'
+    releases = json.loads(request.urlopen(url, timeout=1).read())['releases']
+    releases = sorted(releases, key=parse_version, reverse=True)
+    if releases.index(__version__) > 0:
+        print(f'Outdated SciANN installation is found (V-{__version__}). '
+              f'Get the latest version (V-{releases[0]}):  \n '
+              f'     > pip [--user] install --upgrade sciann  ')
+except:
+    pass

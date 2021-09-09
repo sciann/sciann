@@ -1013,6 +1013,7 @@ class NTKLossWeight(Callback):
                  beta=0.9, freq=100, log_freq=None,
                  alpha=0., types=None, min_max=None, **kwargs):
         super(NTKLossWeight, self).__init__()
+        # print(f"{beta = }, {freq = }, {alpha = }, {min_max = }")
         append_to_bib("wang2020ntk")
         # generate samples.
         self.inputs, self.targets, self.weights = data_generator[0]
@@ -1043,7 +1044,7 @@ class NTKLossWeight(Callback):
         assert len(model.outputs) == len(types)
         self.alpha = alpha
         if alpha>0.:
-            self.base_losses = [1. if li==0. else li for li in self.eval_losses()]
+            self.base_losses = self.eval_losses()
         else:
             self.base_losses = None
         if min_max is None:
@@ -1061,7 +1062,7 @@ class NTKLossWeight(Callback):
 
     def on_epoch_begin(self, epoch, logs={}):
         if epoch % self.freq == 0:
-            losses = None if self.base_losses is None else self.eval_losses()
+            losses = self.eval_losses() if self.base_losses else None
             loss_gradients = self.eval_diag_ntk()
             self.update_loss_weights(epoch, loss_gradients, losses)
             self.update_loss_gradients(epoch, loss_gradients)
@@ -1089,10 +1090,10 @@ class NTKLossWeight(Callback):
         return updated_NTK
 
     def eval_losses(self):
-        return [fi(self.inputs) for fi in self.losses]
+        losses = [fi(self.inputs) for fi in self.losses]
+        return [1. if li==0. else li for li in losses]
 
     def eval_loss_weights(self, updated_grads):
-        # Method 1: normalization by PDE.
         # eval max normalization on PDE.
         ref_grad = []
         for ws in updated_grads:
@@ -1105,53 +1106,51 @@ class NTKLossWeight(Callback):
             new_weights.append(normalization_grad / ref_grad_i)
         return new_weights
 
-    def eval_scored_loss_weights(self, updated_grads, updated_losses):
-        # Method 1: normalization by PDE.
-        # eval max normalization on PDE.
-        ref_grad = []
-        for ws in updated_grads:
-            ref_grad.append(ws.sum())
-        normalization_grad = sum(ref_grad)
-        # eval scores
-        r_score = []
-        for li, l0 in zip(updated_losses, self.base_losses):
-            r_score.append(li/l0 if l0>0. else 0.)
-        normalization_r_score = np.mean(r_score)
-        # evaluate new weights
-        new_weights = []
-        for i, type in enumerate(self.types):
-            ref_grad_i = ref_grad[i] if ref_grad[i] != 0. else np.mean(ref_grad)
-            ref_score_i = (r_score[i]/normalization_r_score)**self.alpha
-            if ref_score_i==0.:
-                ref_score_i = 1.
-            new_weights.append(normalization_grad / ref_grad_i * ref_score_i)
-        return new_weights
-
     def update_loss_weights(self, epoch, updated_grads, updated_losses):
-        if updated_losses is None:
-            new_weights = self.eval_loss_weights(updated_grads)
+        new_weights = self.eval_loss_weights(updated_grads)
+        # print(f"{new_weights = }")
+        n_task = len(new_weights)
+
+        if updated_losses:
+            new_scores = [li / l0 for li, l0 in zip(updated_losses, self.base_losses)]
+            mean_scores = np.mean(new_scores)
+            new_scores = [(li / mean_scores) ** self.alpha for li in new_scores]
         else:
-            new_weights = self.eval_scored_loss_weights(updated_grads, updated_losses)
+            new_scores = n_task * [1.]
+        # print(f"{self.base_losses = }")
+        # print(f"{updated_losses = }")
+        # print(f"{new_scores = }")
+
+        old_weights = [K.get_value(wi) for wi in self.model.loss_weights]
+        ntk_weights = [new_weights[i] * new_scores[i] for i in range(n_task)]
+        # print(f"{ntk_weights = }")
+
         # check for limiting weights.
-        for i, wi in enumerate(new_weights):
+        for i, wi in enumerate(ntk_weights):
             if wi < self.min_max[0]:
-                new_weights[i] = self.min_max[0]
+                ntk_weights[i] = self.min_max[0]
             elif wi > self.min_max[1]:
-                new_weights[i] = self.min_max[1]
-        # normalization
-        weight_normalization = len(new_weights) / sum(new_weights)
+                ntk_weights[i] = self.min_max[1]
+
+        # normalizing weights.
+        norm = n_task / sum(ntk_weights)
+        ntk_weights = [wi * norm for wi in ntk_weights]
+
+        # print(f"{norm = }")
+        # print(f"{ntk_weights = }")
+
         self.loss_weights = []
         # evaluate new weights
-        for i, wi in enumerate(self.model.loss_weights):
-            new_val = (1-self.beta) * K.get_value(wi) \
-                    + self.beta * (new_weights[i] * weight_normalization)
+        for i, wi in enumerate(old_weights):
+            new_val = (1-self.beta) * wi + self.beta * ntk_weights[i]
             K.set_value(self.model.loss_weights[i], new_val)
             self.loss_weights.append(new_val)
+
         # print updates
-        print('\n+ adaptive_weights at epoch {}:'.format(epoch+1), self.loss_weights)
+        print(f'\n+ adaptive_weights at epoch {epoch+1}:', self.loss_weights)
 
     def update_loss_gradients(self, epoch, updated_grads):
-        self.loss_gradients = [np.linalg.norm(lgi) for lgi in updated_grads]
+        self.loss_gradients = [np.linalg.norm(lgi, 2) for lgi in updated_grads]
 
     @staticmethod
     def prepare_inputs(*args, **kwargs):
