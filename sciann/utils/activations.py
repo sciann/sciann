@@ -134,7 +134,7 @@ class SciRowdyActivationLayer(k.layers.Layer):
         self.phis = phis
         self.activation = None
         self.activation_name = "rowdy"
-        self.alpha_initializer = default_constant_initializer(1.0)
+        self.alpha_initializer = default_constant_initializer(1.0/len(phis))
         self.alpha_regularizer = None
         self.alpha_constraint = None
 

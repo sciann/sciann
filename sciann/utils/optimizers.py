@@ -8,15 +8,16 @@ from scipy.optimize import minimize, least_squares
 from tensorflow import keras
 from tensorflow.keras import backend as K  # pylint: disable=import-error
 from tensorflow.python.keras.callbacks import BaseLogger, CallbackList, History  # pylint: disable=no-name-in-module
-from tensorflow.python.keras.optimizer_v2 import optimizer_v2   # pylint: disable=no-name-in-module
+from tensorflow.python.keras.optimizer_v2.optimizer_v2 import OptimizerV2   # pylint: disable=no-name-in-module
 from tensorflow.python.ops import variables as tf_variable
 
 from tensorflow.python.keras.utils.generic_utils import Progbar
+from tensorflow.python.util.tf_export import keras_export
 
 # from tqdm import trange, tqdm_notebook
 
 
-class GradientObserver(optimizer_v2.OptimizerV2):
+class GradientObserver(OptimizerV2):
     """
     Implements the Keras Optimizer interface in order to accumulate gradients for
     each mini batch. Gradients are then read at the end of the epoch by the ScipyOptimizer. 
@@ -94,7 +95,8 @@ class GradientObserver(optimizer_v2.OptimizerV2):
         return config
 
 
-class GeneratorWrapper(keras.utils.Sequence):
+from tensorflow.python.keras.utils.data_utils import Sequence
+class GeneratorWrapper(Sequence):
     """
     Converts fit() into fit_generator() interface.
     """
@@ -134,6 +136,10 @@ class GeneratorWrapper(keras.utils.Sequence):
     def _reshuffle(self):
         if self._num_batches > 1 and self._shuffle:
             self._ids = np.random.choice(self._size, self._size, replace=False)
+
+    def get_config(self):
+        config = super(GeneratorWrapper, self).get_config()
+        return config
 
 
 class ScipyOptimizer(object):

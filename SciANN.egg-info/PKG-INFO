@@ -1,22 +1,11 @@
 Metadata-Version: 2.1
 Name: SciANN
-Version: 0.6.5.0
+Version: 0.6.5.1
 Summary: A Keras/Tensorflow wrapper for scientific computations and physics-informed deep learning using artificial neural networks.
 Home-page: https://github.com/sciann/sciann
 Author: Ehsan Haghighat
 Author-email: ehsan@sciann.com
 License: MIT
-Description: 
-        SciANN is an Artificial Neural Netowork library, 
-        based on Python, Keras, and TensorFlow, designed
-        to perform scientific computations, solving ODEs 
-        and PDEs, curve-fitting, etc, very efficiently.
-        
-        Read the documentation at: https://sciann.com
-        
-        SciANN is compatible with Python 2.7-3.6
-        and is distributed under the MIT license.
-        
 Platform: UNKNOWN
 Classifier: Development Status :: 4 - Beta
 Classifier: Intended Audience :: Developers
@@ -31,3 +20,17 @@ Classifier: Topic :: Software Development :: Libraries
 Classifier: Topic :: Software Development :: Libraries :: Python Modules
 Provides-Extra: visualize
 Provides-Extra: tests
+License-File: LICENSE
+
+
+SciANN is an Artificial Neural Netowork library, 
+based on Python, Keras, and TensorFlow, designed
+to perform scientific computations, solving ODEs 
+and PDEs, curve-fitting, etc, very efficiently.
+
+Read the documentation at: https://sciann.com
+
+SciANN is compatible with Python 2.7-3.6
+and is distributed under the MIT license.
+
+
