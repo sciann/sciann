@@ -1,4 +1,3 @@
-
 # Curve fitting in 1D
 
 Here, a 1D curve fitting example is explored. Imagine, a synthetic data
