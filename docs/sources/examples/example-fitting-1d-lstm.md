@@ -11,7 +11,9 @@ using the `Functional` class.
 
 The target is imposed on the output using the `Data` class from `Constraint`, and passed to the `SciModel` to form a
 Sciann model.
-'''
+
+
+```python 
 
 import numpy as np
 # from sciann.functionals.rnn_variable import RNNVariable
