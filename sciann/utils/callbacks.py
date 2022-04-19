@@ -531,6 +531,89 @@ class InverseDirichletLossWeight(Callback):
         return kwargs
 
 
+@keras_export('keras.callbacks.SelfAdaptiveLossWeight')
+class SelfAdaptiveLossWeight(Callback):
+    """ Callback that evaluate the adaptive weights based on the Gradient Pathologies approach by Wang et al.
+    """
+
+    def __init__(self, model, data_generator,
+                 eta=0.001, freq=1, log_freq=None,
+                 min_max=None, **kwargs):
+        super(SelfAdaptiveLossWeight, self).__init__()
+        append_to_bib(["mcclenny2020self"])
+        # generate samples.
+        self.inputs, self.targets, self.weights = data_generator[0]
+        # eval loss and gradients.
+        self.losses = []
+        for i in range(len(model.outputs)):
+            # fixed batch size
+            yp = model.outputs[i]
+            ys = self.targets[i]
+            ws = self.weights[i]
+            f = tf.reduce_mean(
+                model.loss_functions[i](ys, yp, sample_weight=ws)
+            )
+            self.losses.append(K.function(model.inputs, f))
+        self.freq = np.Inf if (freq == True or freq == 0) else freq
+        self.eta = eta
+        if log_freq is None:
+            self.log_freq = self.freq
+        else:
+            self.log_freq = log_freq
+        self.base_losses = [1. if li==0. else li for li in self.eval_losses()]
+        if min_max is None:
+            self.min_max = [-np.Inf, np.Inf]
+        else:
+            assert len(min_max) == 2
+            self.min_max = min_max
+
+    def on_epoch_begin(self, epoch, logs={}):
+        if epoch % self.freq == 0:
+            self.update(epoch)
+
+    def update(self, epoch):
+        losses = self.eval_losses()
+        self.update_loss_weights(epoch, losses)
+
+    def on_epoch_end(self, epoch, logs={}):
+        # log gradient values
+        for i, wi in enumerate(self.loss_weights):
+            logs[f'loss_weight_{i}'] = wi
+
+    def eval_losses(self):
+        return [l(self.inputs) for l in self.losses]
+
+    def update_loss_weights(self, epoch, updated_losses):
+        old_weights = [K.get_value(wi) for wi in self.model.loss_weights]
+        sa_weights = [wi + self.eta*li for wi, li in zip(old_weights, updated_losses)]
+        # check for limiting weights.
+        for i, wi in enumerate(sa_weights):
+            if wi < self.min_max[0]:
+                sa_weights[i] = self.min_max[0]
+            elif wi > self.min_max[1]:
+                sa_weights[i] = self.min_max[1]
+        # normalizing weights.
+        norm = len(sa_weights) / sum(sa_weights)
+        sa_weights = [sai * norm for sai in sa_weights]
+
+        self.loss_weights = []
+        # evaluate new weights
+        for i, wi in enumerate(sa_weights):
+            K.set_value(self.model.loss_weights[i], wi)
+            self.loss_weights.append(wi)
+        # print updates
+        print('\n+ adaptive_weights at epoch {}:'.format(epoch + 1), self.loss_weights)
+
+    @staticmethod
+    def prepare_inputs(*args, **kwargs):
+        kwargs['method'] = 'SA'
+        if len(args) == 1:
+            kwargs['freq'] = args[0]
+        elif len(args) > 0:
+            raise ValueError
+        return kwargs
+
+
 @keras_export('keras.callbacks.LossGradientHistory')
 class LossGradientHistory(Callback):
     """ Callback that evaluate the gradient of loss terms.
@@ -1557,6 +1640,13 @@ def setup_adaptive_weight_callback(adaptive_weights, model, constraints, data_ge
 
     elif adaptive_weights["method"].lower() in ("id", "inversedirichlet", "inverse_dirichlet"):
         return InverseDirichletLossWeight(
+            model, data_generator=data_generator,
+            types=[type(v).__name__ for v in constraints],
+            **adaptive_weights
+        )
+
+    elif adaptive_weights["method"].lower() in ("sa", "selfadaptive", "self_adaptive"):
+        return SelfAdaptiveLossWeight(
             model, data_generator=data_generator,
             types=[type(v).__name__ for v in constraints],
             **adaptive_weights

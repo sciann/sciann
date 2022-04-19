@@ -5,10 +5,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import tensorflow as tf 
 from tensorflow.python.keras import backend as K
 graph_unique_name = K.get_graph().unique_name
 
-from tensorflow.python.keras.layers import Lambda, Flatten, Dense
+from tensorflow.python.keras.layers import Layer, Lambda, Flatten, Dense
 from tensorflow.python.keras.layers import Dot
 from tensorflow.python.keras.layers import Input
 from tensorflow.python.keras.models import Model

@@ -12,7 +12,7 @@ from tensorflow.python.keras.layers import Dense
 from tensorflow.python.keras.layers import Activation
 from tensorflow.python.keras.layers import Concatenate
 from tensorflow.python.keras.layers import Lambda
-from tensorflow.python.keras.layers import BatchNormalization
+# from tensorflow.python.keras.layers import BatchNormalization
 from tensorflow.python.keras.models import Model
 from tensorflow import tensordot, expand_dims
 

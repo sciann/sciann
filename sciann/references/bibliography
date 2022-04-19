@@ -95,3 +95,10 @@
   journal={arXiv preprint arXiv:2105.09513},
   year={2021}
 }
+
+@article{mcclenny2020self,
+  title={Self-adaptive physics-informed neural networks using a soft attention mechanism},
+  author={McClenny, Levi and Braga-Neto, Ulisses},
+  journal={arXiv preprint arXiv:2009.04544},
+  year={2020}
+}

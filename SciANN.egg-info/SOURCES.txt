@@ -73,6 +73,7 @@ examples/example-fitting-1d-lstm.py
 examples/example-fitting-1d-rnn.py
 examples/example-fitting-1d.py
 examples/example-fitting-fourier.py
+examples/model.png
 examples/test_diff.py
 examples/__pycache__/test_diff.cpython-38-pytest-6.2.2.pyc
 logo/SciANN-Loss.jpg
@@ -85,8 +86,6 @@ sciann/constraints/pde.py
 sciann/constraints/tie.py
 sciann/functionals/__init__.py
 sciann/functionals/field.py
-sciann/functionals/fourier.py
-sciann/functionals/functional.backup.py
 sciann/functionals/functional.py
 sciann/functionals/mlp_functional.py
 sciann/functionals/parameter.py
@@ -106,10 +105,10 @@ sciann/utils/initializers.py
 sciann/utils/math.py
 sciann/utils/optimizers.py
 sciann/utils/schedules.py
-sciann/utils/transformers.py
 sciann/utils/utilities.py
 sciann/utils/validations.py
 tests/test_api.py
 tests/__pycache__/test_api.cpython-38-pytest-6.2.2.pyc
+tests/__pycache__/test_api.cpython-38-pytest-7.0.1.pyc
 tests/__pycache__/test_eval.cpython-38-pytest-6.2.2.pyc
 tests/__pycache__/test_eval2.cpython-38-pytest-6.2.2.pyc
