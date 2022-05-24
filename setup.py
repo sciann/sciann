@@ -29,7 +29,7 @@ setup(
                       'h5py',
                       'sklearn',
                       'pybtex',
-                      'tensorflow>=2.1.4,<=2.5.3',
+                      'tensorflow>=2.1.4,<2.6.5',
                       ],
     extras_require={
           'visualize': ['pydot>=1.2.4'],
