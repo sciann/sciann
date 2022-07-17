@@ -3,8 +3,8 @@ from __future__ import division
 from __future__ import print_function
 
 from ..utils import default_bias_initializer, default_kernel_initializer, default_constant_initializer
-from tensorflow.python.keras.layers import Dense, SimpleRNN, LSTM
-from tensorflow.python.keras.activations import linear
+from keras.layers import Dense, SimpleRNN, LSTM
+from keras.activations import linear
 
 from ..utils import default_bias_initializer, default_kernel_initializer
 from ..utils import default_regularizer

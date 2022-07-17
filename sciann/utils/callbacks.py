@@ -7,8 +7,8 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow.python import keras as k
-from tensorflow.python.keras import backend as K
-from tensorflow.python.keras.callbacks import Callback
+from keras import backend as K
+from keras.callbacks import Callback
 from tensorflow.python.util.tf_export import keras_export
 from scipy.optimize import Bounds, LinearConstraint, minimize
 
@@ -965,7 +965,7 @@ class LossLandscapeHistory(Callback):
         inputs, targets, weights = data_generator[0]
         self._model = model
         self._inputs = inputs
-        self._layers = [layer for layer in model._layers if layer.weights]
+        self._layers = [layer for layer in model.layers if layer.weights]
         self._weights_size = 0
         for layer in self._layers:
             for w in layer.weights:

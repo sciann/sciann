@@ -8,13 +8,13 @@ from __future__ import print_function
 import os
 
 import tensorflow as tf
-from tensorflow.python.keras import backend as K
+from keras import backend as K
 from tensorflow.python import keras as k
 import numpy as np
 
-from tensorflow.python.keras.utils.data_utils import Sequence
-from tensorflow.python.keras.models import Model
-from tensorflow.python.keras.utils.vis_utils import plot_model
+from keras.utils.data_utils import Sequence
+from keras.models import Model
+from keras.utils.vis_utils import plot_model
 from tensorflow import gradients as tf_gradients
 
 from ..utils import unpack_singleton, to_list
@@ -564,7 +564,7 @@ class SciModel(object):
         history = opt_fit_func(
             data_generator,  # sums to number of samples.
             epochs=epochs,
-            callbacks=sci_callbacks + to_list(callbacks),
+            callbacks=to_list(sci_callbacks) + to_list(callbacks),
             validation_data=validation_data,
             **kwargs
         )

@@ -110,5 +110,7 @@ sciann/utils/validations.py
 tests/test_api.py
 tests/__pycache__/test_api.cpython-38-pytest-6.2.2.pyc
 tests/__pycache__/test_api.cpython-38-pytest-7.0.1.pyc
+tests/__pycache__/test_api.cpython-38-pytest-7.1.2.pyc
+tests/__pycache__/test_api.cpython-39-pytest-7.1.2.pyc
 tests/__pycache__/test_eval.cpython-38-pytest-6.2.2.pyc
 tests/__pycache__/test_eval2.cpython-38-pytest-6.2.2.pyc

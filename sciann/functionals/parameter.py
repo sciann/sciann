@@ -7,18 +7,19 @@ from __future__ import print_function
 
 from tensorflow.python import keras as k
 
-from tensorflow.python.keras import backend as K
+from keras import backend as K
 graph_unique_name = K.get_graph().unique_name
 
-from tensorflow.python.keras.layers import Dense
-from tensorflow.python.keras.layers import Concatenate
+from keras.layers import Dense
+from keras.layers import Concatenate
 from tensorflow.python.keras.layers import InputSpec
-from tensorflow.python.keras.constraints import MinMaxNorm
+from keras.constraints import MinMaxNorm
+from keras.constraints import Constraint
 from tensorflow.python.util.tf_export import keras_export
-from tensorflow.python.keras.utils import tf_utils
-from tensorflow.python.keras import constraints
-from tensorflow.python.keras import initializers
-from tensorflow.python.keras import regularizers
+from keras.utils import tf_utils
+from keras import constraints
+from keras import initializers
+from keras import regularizers
 
 from ..utils import to_list
 from ..utils import default_constant_initializer
@@ -165,8 +166,6 @@ class ParameterBase(k.layers.Layer):
     def compute_output_shape(self, input_shape):
         return self.param.shape
 
-
-from tensorflow.python.keras.constraints import Constraint
 
 @keras_export('keras.constraints.MinMax')
 class MinMax(Constraint):
