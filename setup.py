@@ -15,7 +15,7 @@ and is distributed under the MIT license.
 
 setup(
     name='SciANN',
-    version='0.6.6.1',
+    version='0.6.6.2',
     description='A Keras/Tensorflow wrapper for scientific computations and physics-informed deep learning using artificial neural networks.',
     long_description=long_description,
     author='Ehsan Haghighat',
@@ -29,10 +29,10 @@ setup(
                       'h5py',
                       'sklearn',
                       'pybtex',
-                      'tensorflow>=2.1.4,<=2.5.3',
+                      'tensorflow>=2.1.4,<2.6',
                       ],
     extras_require={
-          'visualize': ['pydot>=1.2.4'],
+          'visualize': ['pydot>=1.2.4', 'matplotlib'],
           'tests': ['pytest',
                     'pytest-pep8',
                     'pytest-xdist',
