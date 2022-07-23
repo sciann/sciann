@@ -6,7 +6,7 @@ from keras import constraints
 from keras import initializers
 from keras import regularizers
 from keras.utils import tf_utils
-from keras.engine.input_spec import InputSpec
+from tensorflow.python.keras.layers import InputSpec
 from keras.initializers import Constant as default_constant_initializer
 
 
