@@ -1,0 +1,15 @@
+tensorflow==2.8.0
+keras==2.8.0
+numpy
+scipy
+pandas
+matplotlib
+scikit_learn
+tqdm
+sklearn
+pybtex
+h5py
+pydot 
+graphviz
+pytest 
+mkdocs
