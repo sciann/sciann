@@ -123,6 +123,17 @@ If you are using a virtualenv, you may want to avoid using sudo:
 pip install sciann
 ```
 
+Note: To install tensorflow/sicann on M1 Apple systems, do the following:
+```sh
+conda install -c apple tensorflow-deps=2.9.0
+pip install tensorflow-macos=2.9.0
+conda install matpltlib pandas    #(ETC)
+```
+and then 
+```sh
+pip install sciann-macos
+```
+
 - **Alternatively: install SciANN from the GitHub source:**
 
 First, clone SciANN using `git`:
