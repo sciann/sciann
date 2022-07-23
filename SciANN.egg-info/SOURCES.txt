@@ -96,7 +96,8 @@ sciann/functionals/rnn_variable.py
 sciann/functionals/variable.py
 sciann/models/__init__.py
 sciann/models/model.py
-sciann/references/bibliography
+sciann/references/__init__.py
+sciann/references/bibliography.py
 sciann/utils/__init__.py
 sciann/utils/activations.py
 sciann/utils/callbacks.py

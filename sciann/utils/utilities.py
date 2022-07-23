@@ -77,10 +77,10 @@ def get_default_log_path():
     return _DEFAULT_LOG_PATH
 
 
-def initialize_bib(bib_file):
+def initialize_bib(bib_str):
     global _BIBLIOGRAPHY
     global _BIBLIOGRAPHY_TO_OUTPUT
-    _BIBLIOGRAPHY = bibtex.Parser().parse_file(bib_file)
+    _BIBLIOGRAPHY = bibtex.Parser().parse_string(bib_str)
     _BIBLIOGRAPHY_TO_OUTPUT.append(_BIBLIOGRAPHY.entries['haghighat2021sciann'])
     _BIBLIOGRAPHY_TO_OUTPUT.append(_BIBLIOGRAPHY.entries['raissi2019physics'])
 
