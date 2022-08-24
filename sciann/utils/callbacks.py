@@ -4,6 +4,7 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+from multiprocessing import reduction
 
 import tensorflow as tf
 from tensorflow.python import keras as k
@@ -98,7 +99,7 @@ class GradientPathologyLossWeight(Callback):
             self.losses.append(K.function(model.inputs, f))
             gf = tf_gradients(f, model.trainable_weights, unconnected_gradients='zero')
             self.loss_grads.append([K.function(model.inputs, gf)])
-        self.freq = np.Inf if (freq==True or freq==0) else freq
+        self.freq = np.Inf if (freq==False or freq==0) else freq
         self.beta = beta
         assert len(self.targets) == len(types)
         self.types = types
@@ -267,7 +268,7 @@ class GradNormLossWeight(Callback):
             self.losses.append(K.function(model.inputs, f))
             gf = tf_gradients(f, model.trainable_weights, unconnected_gradients='zero')
             self.loss_grads.append([K.function(model.inputs, gf)])
-        self.freq = np.Inf if (freq == True or freq == 0) else freq
+        self.freq = np.Inf if (freq == False or freq == 0) else freq
         self.beta = beta
         assert len(self.targets) == len(types)
         self.types = types
@@ -419,7 +420,7 @@ class InverseDirichletLossWeight(Callback):
                 self.loss_grads.append(g2f)
             else:
                 self.loss_grads.append([K.function(model.inputs, gf)])
-        self.freq = np.Inf if (freq == True or freq == 0) else freq
+        self.freq = np.Inf if (freq == False or freq == 0) else freq
         self.beta = beta
         assert len(self.targets) == len(types)
         self.types = types
@@ -554,7 +555,7 @@ class SelfAdaptiveLossWeight(Callback):
                 model.loss_functions[i](ys, yp, sample_weight=ws)
             )
             self.losses.append(K.function(model.inputs, f))
-        self.freq = np.Inf if (freq == True or freq == 0) else freq
+        self.freq = np.Inf if (freq == False or freq == 0) else freq
         self.eta = eta
         if log_freq is None:
             self.log_freq = self.freq
@@ -606,6 +607,130 @@ class SelfAdaptiveLossWeight(Callback):
 
     @staticmethod
     def prepare_inputs(*args, **kwargs):
+        kwargs['method'] = 'SALW'
+        if len(args) == 1:
+            kwargs['freq'] = args[0]
+        elif len(args) > 0:
+            raise ValueError
+        return kwargs
+
+
+@keras_export('keras.callbacks.SelfAdaptiveSampleWeight')
+class SelfAdaptiveSampleWeight(Callback):
+    """ Callback that evaluate the adaptive weights based on the Gradient Pathologies approach by Wang et al.
+    """
+
+    def __init__(self, model, data_generator,
+                 eta=0.001, freq=1, log_freq=None,
+                 loss="MSE",
+                 min_max=None, **kwargs):
+        super(SelfAdaptiveSampleWeight, self).__init__()
+        append_to_bib(["mcclenny2020self"])
+        # generate samples.
+        self.data_generator = data_generator
+        if loss.lower() in ("mse", "meansquarederror", "mean_squared_error"):
+            self.loss_func = lambda t, p: np.mean((t - p)**2, axis=-1)
+        elif loss.lower() in ("mae", "meanabsoluteerror", "mean_absolute_error"):
+            self.loss_func = lambda t, p: np.mean(abs(t - p), axis=-1)
+        else:
+            raise ValueError('Unrecognized loss function for self-adaptive-weights: ', loss)
+        self.losses = []
+        for i in range(len(model.outputs)):
+            # fixed batch size
+            loss_i = K.function(model.inputs, model.outputs[i])
+            self.losses.append(loss_i)
+        # eval loss and gradients.
+        self.freq = np.Inf if (freq == False or freq == 0) else freq
+        self.eta = eta
+        if log_freq is None:
+            self.log_freq = self.freq
+        else:
+            self.log_freq = log_freq
+        if min_max is None:
+            self.min_max = [-np.Inf, np.Inf]
+        else:
+            assert len(min_max) == 2
+            self.min_max = min_max
+
+    def on_epoch_begin(self, epoch, logs={}):
+        if epoch % self.freq == 0:
+            self.update(epoch)
+
+    def update(self, epoch):
+        losses = self.eval_losses()
+        self.update_loss_weights(epoch, losses)
+
+    def on_epoch_end(self, epoch, logs={}):
+        # log gradient values
+        for i, wi in enumerate(self.loss_weights):
+            logs[f'loss_weight_{i}'] = wi
+
+    def eval_losses(self):
+        weights = self.data_generator._sample_weights
+        losses = []
+        for i, (loss, wi) in enumerate(zip(self.losses, weights)):
+            ids = wi > 0
+            inputs = [x[ids, :] for x in self.data_generator._inputs]
+            trues = self.data_generator._outputs[i][ids]
+            # eval loss
+            loss_i = np.zeros_like(wi)
+            loss_i[ids] = self.loss_func(trues, loss(inputs))
+            losses.append(loss_i)
+        return losses
+
+    def update_loss_weights(self, epoch, updated_losses):
+        sa_weights = []
+        for w0, li in zip(self.data_generator._sample_weights, updated_losses):
+            w1 = w0 + self.eta*li
+            sa_weights.append(w1)
+        # check for limiting weights.
+        for i, wi in enumerate(sa_weights):
+            sa_weights[i] = np.maximum(wi, self.min_max[0])
+            sa_weights[i] = np.minimum(wi, self.min_max[1])
+        # # normalize losses
+        # scaling_factor = len(sa_weights) * sa_weights[0].size
+        # sa_weights = [wi*(scaling_factor/np.sum(wi)) for wi in sa_weights]
+        # update weights in data-generator
+        self.data_generator._sample_weights = sa_weights
+        self.loss_weights = []
+        # evaluate new weights
+        for i, wi in enumerate(sa_weights):
+            self.loss_weights.append(wi.mean())
+        # print updates
+        print('\n+ adaptive_weights at epoch {}:'.format(epoch + 1), self.loss_weights)
+
+    @staticmethod
+    def prepare_inputs(*args, **kwargs):
+        kwargs['method'] = 'SASW'
+        if len(args) == 1:
+            kwargs['freq'] = args[0]
+        elif len(args) > 0:
+            raise ValueError
+        return kwargs
+
+
+
+@keras_export('keras.callbacks.SelfAdaptiveLossWeight2')
+class SelfAdaptiveLossWeight2(Callback):
+    """ Callback that evaluate the adaptive weights based on the Gradient Pathologies approach by Wang et al.
+    """
+
+    def __init__(self, model, data_generator,
+                 eta=0.001, freq=1, log_freq=None,
+                 min_max=None, **kwargs):
+        super(SelfAdaptiveLossWeight2, self).__init__()
+        append_to_bib(["mcclenny2020self"])
+        # generate samples.
+        self.data_generator = data_generator
+        self.model = model
+
+    def on_epoch_begin(self, epoch, logs={}):
+        self.data_generator.update_sample_weights()
+        print('self-adaptive is updated')
+        # pass
+
+    @staticmethod
+    def prepare_inputs(*args, **kwargs):
         kwargs['method'] = 'SA'
         if len(args) == 1:
             kwargs['freq'] = args[0]
@@ -643,7 +768,7 @@ class LossGradientHistory(Callback):
                     g2f.append(K.function(model.inputs, g2fi))
                 self.loss_hessians.append(g2f)
         self.path = get_log_path(path, 'loss-')
-        self.freq = np.Inf if (freq==True or freq==0) else freq
+        self.freq = np.Inf if (freq==False or freq==0) else freq
 
     def on_epoch_end(self, epoch, logs={}):
         loss_gradients = None
@@ -724,7 +849,7 @@ class MTLLossWeight(Callback):
             self.loss_grads.append(
                 K.function(model.inputs, gf)
             )
-        self.freq = np.Inf if (freq==True or freq==0) else freq
+        self.freq = np.Inf if (freq==False or freq==0) else freq
         self.hist_gradient = []
         self.hist_parameters = []
         self.loss_weights = len(model.outputs) * [1.]
@@ -827,7 +952,7 @@ class ScoreLossWeight(Callback):
             )
             self.losses.append(K.function(model.inputs, f))
 
-        self.freq = np.Inf if (freq==True or freq==0) else freq
+        self.freq = np.Inf if (freq==False or freq==0) else freq
         self.alpha = alpha
         self.beta = beta
         self.base_losses = [1. if li == 0. else li for li in self.eval_losses()]
@@ -1117,7 +1242,7 @@ class NTKLossWeight(Callback):
             gf = tf_gradients(yp, model.trainable_weights, unconnected_gradients='zero')
             gf_dot_gf = tf.add_n([tf.reduce_sum(tf.multiply(gf_i, gf_i)) for gf_i in gf])
             self.loss_grads.append(K.function(model.inputs, gf_dot_gf))
-        self.freq = np.Inf if (freq==True or freq==0) else freq
+        self.freq = np.Inf if (freq==False or freq==0) else freq
         self.beta = beta
         self.types = types
         if log_freq is None:
@@ -1276,7 +1401,7 @@ class NTKLossWeight(Callback):
 #             ws = self.weights[i]
 #             gf = tf_gradients(yp, model.trainable_weights, unconnected_gradients='zero')
 #             self.loss_grads.append(K.function(model.inputs, gf))
-#         self.freq = np.Inf if (freq==True or freq==0) else freq
+#         self.freq = np.Inf if (freq==False or freq==0) else freq
 #         self.beta = beta
 #         self.types = types
 #         if log_freq is None:
@@ -1410,7 +1535,7 @@ class NTKSampleWeight(Callback):
             ws = self.weights[i]
             gf = tf_gradients(yp, model.trainable_weights, unconnected_gradients='zero')
             self.loss_grads.append(K.function(model.inputs, gf))
-        self.freq = np.Inf if (freq==True or freq==0) else freq
+        self.freq = np.Inf if (freq==False or freq==0) else freq
         self.beta = beta
         self.types = types
         if log_freq is None:
@@ -1533,7 +1658,7 @@ class AdaptiveSampleWeight(Callback):
             self.losses.append(
                 K.function(model.inputs, yp)
             )
-        self.freq = np.Inf if (freq==True or freq==0) else freq
+        self.freq = np.Inf if (freq==False or freq==0) else freq
         self.beta = beta
         self.types = types
         if log_freq is None:
@@ -1579,7 +1704,7 @@ class AdaptiveSampleWeight2(Callback):
             self.loss = K.function(model.inputs, model.outputs[0])
         else:
             self.loss = K.function(model.inputs, loss.outputs)
-        self.freq = np.Inf if (freq==True or freq==0) else freq
+        self.freq = np.Inf if (freq==False or freq==0) else freq
         self.beta = beta
         if log_freq is None:
             self.log_freq = self.freq
@@ -1645,6 +1770,13 @@ def setup_adaptive_weight_callback(adaptive_weights, model, constraints, data_ge
             **adaptive_weights
         )
 
+    elif adaptive_weights["method"].lower() in ("sasw", "selfadaptivesampleweight", "self_adaptive_sample_weight"):
+        return SelfAdaptiveSampleWeight(
+            model, data_generator=data_generator,
+            types=[type(v).__name__ for v in constraints],
+            **adaptive_weights
+        )
+    
     elif adaptive_weights["method"].lower() in ("sa", "selfadaptive", "self_adaptive"):
         return SelfAdaptiveLossWeight(
             model, data_generator=data_generator,
