@@ -726,7 +726,7 @@ class SciModel(object):
                     adjusted_yt = yt[1]
                     if ids.size == yt[1].shape[0] and ids.size < num_sample:
                         adjusted_yt = np.zeros((num_sample,)+yt[1].shape[1:])
-                        adjusted_yt[ids, :] = yt[1]
+                        adjusted_yt[ids] = yt[1]
                     elif yt[1].shape[0] != num_sample:
                         raise ValueError(
                             'Error in size of the target {}.'.format(i)
