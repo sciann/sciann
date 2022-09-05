@@ -1,3 +1,5 @@
+BIBLIOGRAPHY_STR = """
+
 @article{haghighat2021sciann,
   title={SciANN: A Keras/TensorFlow wrapper for scientific computations and physics-informed deep learning using artificial neural networks},
   author={Haghighat, Ehsan and Juanes, Ruben},
@@ -95,3 +97,12 @@
   journal={arXiv preprint arXiv:2105.09513},
   year={2021}
 }
+
+@article{mcclenny2020self,
+  title={Self-adaptive physics-informed neural networks using a soft attention mechanism},
+  author={McClenny, Levi and Braga-Neto, Ulisses},
+  journal={arXiv preprint arXiv:2009.04544},
+  year={2020}
+}
+
+"""

@@ -32,6 +32,7 @@ import json
 from urllib import request
 from pkg_resources import parse_version
 
+from .references import BIBLIOGRAPHY_STR
 
 # SciANN.
 __author__ = "Ehsan Haghighat"
@@ -40,7 +41,7 @@ __copyright__ = "Copyright 2019, Physics-Informed Deep Learning"
 __credits__ = []
 __url__ = "http://github.com/sciann/sciann]"
 __license__ = "MIT"
-__version__ = "0.6.5.1"
+__version__ = "0.6.7.4"
 __cite__ = \
     '@article{haghighat2021sciann, \n' +\
     '    title={SciANN: A Keras/TensorFlow wrapper for scientific computations and physics-informed deep learning using artificial neural networks}, \n' +\
@@ -79,7 +80,7 @@ else:
 
 # set default logging directory.
 set_default_log_path(os.path.join(os.getcwd(), "logs"))
-initialize_bib(os.path.join(os.path.dirname(__file__), 'references', 'bibliography'))
+initialize_bib(BIBLIOGRAPHY_STR)
 
 # check sciann version.
 try:

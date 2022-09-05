@@ -2,10 +2,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from tensorflow.python.keras import backend as K
+from keras import backend as K
 graph_unique_name = K.get_graph().unique_name
 
-from tensorflow.python.keras.layers import InputLayer
+from keras.layers import InputLayer
 
 from ..utils import to_list
 from ..utils import Lambda

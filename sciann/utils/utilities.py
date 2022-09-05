@@ -11,19 +11,19 @@ from numpy import pi
 
 import tensorflow as tf
 from tensorflow.python import keras as k
-from tensorflow.python.keras import backend as K
+from keras import backend as K
 
 # interface for some keras features to be acessible across sciann.
-from tensorflow.python.keras.backend import is_keras_tensor as is_tensor
-from tensorflow.python.keras.backend import floatx
-from tensorflow.python.keras.backend import set_floatx
-from tensorflow.python.keras.utils.vis_utils import model_to_dot
-from tensorflow.python.keras.utils.vis_utils import plot_model
-from tensorflow.python.keras.initializers import RandomUniform as default_bias_initializer
-from tensorflow.python.keras.initializers import GlorotNormal as default_kernel_initializer
-from tensorflow.python.keras.initializers import Constant as default_constant_initializer
-from tensorflow.python.keras.initializers import VarianceScaling
-from tensorflow.python.keras.regularizers import l1_l2
+from keras.backend import is_keras_tensor as is_tensor
+from keras.backend import floatx
+from keras.backend import set_floatx
+from keras.utils.vis_utils import model_to_dot
+from keras.utils.vis_utils import plot_model
+from keras.initializers import RandomUniform as default_bias_initializer
+from keras.initializers import GlorotNormal as default_kernel_initializer
+from keras.initializers import Constant as default_constant_initializer
+from keras.initializers import VarianceScaling
+from keras.regularizers import l1_l2
 
 from .initializers import SciKernelInitializer as KInitializer
 from .initializers import SciBiasInitializer as BInitializer
@@ -77,10 +77,10 @@ def get_default_log_path():
     return _DEFAULT_LOG_PATH
 
 
-def initialize_bib(bib_file):
+def initialize_bib(bib_str):
     global _BIBLIOGRAPHY
     global _BIBLIOGRAPHY_TO_OUTPUT
-    _BIBLIOGRAPHY = bibtex.Parser().parse_file(bib_file)
+    _BIBLIOGRAPHY = bibtex.Parser().parse_string(bib_str)
     _BIBLIOGRAPHY_TO_OUTPUT.append(_BIBLIOGRAPHY.entries['haghighat2021sciann'])
     _BIBLIOGRAPHY_TO_OUTPUT.append(_BIBLIOGRAPHY.entries['raissi2019physics'])
 

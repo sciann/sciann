@@ -5,15 +5,15 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from tensorflow.python.keras import backend as K
+from keras import backend as K
 graph_unique_name = K.get_graph().unique_name
 
-from tensorflow.python.keras.layers import Dense
-from tensorflow.python.keras.layers import Activation
-from tensorflow.python.keras.layers import Concatenate
-from tensorflow.python.keras.layers import Lambda
-from tensorflow.python.keras.layers import BatchNormalization
-from tensorflow.python.keras.models import Model
+from keras.layers import Dense
+from keras.layers import Activation
+from keras.layers import Concatenate
+from keras.layers import Lambda
+# from keras.layers import BatchNormalization
+from keras.models import Model
 from tensorflow import tensordot, expand_dims
 
 from ..utils import to_list, unpack_singleton, is_same_tensor, unique_tensors

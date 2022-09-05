@@ -5,12 +5,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from tensorflow.python.keras import backend as K
+from keras import backend as K
 graph_unique_name = K.get_graph().unique_name
 
-from tensorflow.python.keras.layers import Dense, LSTM, SimpleRNN
-from tensorflow.python.keras.layers import Activation
-from tensorflow.python.keras.layers import Concatenate
+from keras.layers import Dense, LSTM, SimpleRNN
+from keras.layers import Activation
+from keras.layers import Concatenate
 
 from ..utils import to_list, unpack_singleton, is_same_tensor, unique_tensors
 from ..utils import default_weight_initializer

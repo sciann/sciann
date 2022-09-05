@@ -7,12 +7,11 @@ import numpy as np
 from scipy.optimize import minimize, least_squares
 from tensorflow import keras
 from tensorflow.keras import backend as K  # pylint: disable=import-error
-from tensorflow.python.keras.callbacks import BaseLogger, CallbackList, History  # pylint: disable=no-name-in-module
-from tensorflow.python.keras.optimizer_v2.optimizer_v2 import OptimizerV2   # pylint: disable=no-name-in-module
+from keras.callbacks import BaseLogger, CallbackList, History  # pylint: disable=no-name-in-module
+from keras.optimizers import Optimizer as OptimizerV2   # pylint: disable=no-name-in-module
+# from keras.backend import variable as tf_variable
 from tensorflow.python.ops import variables as tf_variable
-
-from tensorflow.python.keras.utils.generic_utils import Progbar
-from tensorflow.python.util.tf_export import keras_export
+from keras.utils.generic_utils import Progbar
 
 # from tqdm import trange, tqdm_notebook
 
@@ -24,7 +23,7 @@ class GradientObserver(OptimizerV2):
     """
 
     def __init__(self, learning_rate=0.001, method='L-BFGS-B', **kwargs):
-        super(GradientObserver, self).__init__('GradientObserver')
+        super(GradientObserver, self).__init__()
         self._learning_rate = tf_variable.Variable(kwargs.get('lr', learning_rate), 'float32')
         self._method = method.lower().split("scipy-")[-1]
         self._vars = []
@@ -33,10 +32,12 @@ class GradientObserver(OptimizerV2):
     @property
     def learning_rate(self):
         return self._learning_rate
+        # return self._get_hyper("learning_rate")
 
     @property
     def lr(self):
         return self._learning_rate
+        # return self._get_hyper("learning_rate")
 
     @property
     def method(self):
@@ -95,7 +96,7 @@ class GradientObserver(OptimizerV2):
         return config
 
 
-from tensorflow.python.keras.utils.data_utils import Sequence
+from keras.utils.data_utils import Sequence
 class GeneratorWrapper(Sequence):
     """
     Converts fit() into fit_generator() interface.

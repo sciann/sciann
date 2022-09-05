@@ -146,6 +146,19 @@ def test_functional_exceptions(variable_x):
         ft = sn.Functional('ft', x, 2*[10], 12)
 
 
+def test_activation_function_exceptions(variable_x):
+    x = variable_x
+    assert sn.is_functional(
+        sn.Functional('ft', x, 2*[10], 'l-tanh')
+    )
+    assert sn.is_functional(
+        sn.Functional('gt', x, 2*[10], 'g-tanh')
+    )
+    assert sn.is_functional(
+        sn.Functional('rt', x, 2*[10], ['tanh', 'sin', 'l-tanh'])
+    )
+
+
 def test_variable_operators(variable_x, variable_y):
     assert sn.is_functional(variable_x**2)
     assert sn.is_functional(sn.tanh(variable_x))

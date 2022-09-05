@@ -7,8 +7,8 @@ from ..utils import prepare_default_activations_and_initializers
 from ..utils import default_regularizer
 from ..utils import floatx, set_floatx
 
-from tensorflow.python.keras.layers import Dense
-from tensorflow.python.keras.activations import linear
+from keras.layers import Dense
+from keras.activations import linear
 
 
 class Field(Dense):

@@ -2,12 +2,12 @@
 from tensorflow import math as tf_math
 from tensorflow.python import keras as k
 from tensorflow.python.util.tf_export import keras_export
-from tensorflow.python.keras import constraints
-from tensorflow.python.keras import initializers
-from tensorflow.python.keras import regularizers
-from tensorflow.python.keras.utils import tf_utils
-from tensorflow.python.keras.engine.input_spec import InputSpec
-from tensorflow.python.keras.initializers import Constant as default_constant_initializer
+from keras import constraints
+from keras import initializers
+from keras import regularizers
+from keras.utils import tf_utils
+from tensorflow.python.keras.layers import InputSpec
+from keras.initializers import Constant as default_constant_initializer
 
 
 @keras_export('keras.activations.SciActivation')

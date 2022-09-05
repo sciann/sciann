@@ -5,13 +5,14 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from tensorflow.python.keras import backend as K
+import tensorflow as tf 
+from keras import backend as K
 graph_unique_name = K.get_graph().unique_name
 
-from tensorflow.python.keras.layers import Lambda, Flatten, Dense
-from tensorflow.python.keras.layers import Dot
-from tensorflow.python.keras.layers import Input
-from tensorflow.python.keras.models import Model
+from keras.layers import Layer, Lambda, Flatten, Dense
+from keras.layers import Dot
+from keras.layers import Input
+from keras.models import Model
 from tensorflow import sin as tf_sin
 from tensorflow import cos as tf_cos
 from tensorflow import tile as tf_tile

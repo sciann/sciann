@@ -1,14 +1,4 @@
-[![PyPI Version](https://badge.fury.io/py/SciANN.svg)](https://badge.fury.io/py/SciANN)
-[![Build Status](https://github.com/sciann/sciann/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/sciann/sciann/actions/workflows/build.yml/badge.svg?branch=master)
-[![Downloads](https://pepy.tech/badge/sciann)](https://pepy.tech/project/sciann)
-[![Downloads](https://pepy.tech/badge/sciann/month)](https://pepy.tech/project/sciann)
-[![Downloads](https://pepy.tech/badge/sciann/week)](https://pepy.tech/project/sciann)
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/sciann/sciann/blob/master/LICENSE)
-
-
-# SciANN: Neural Networks for Scientific Computations  
-
-SciANN is a Keras wrapper for scientific computations and physics-informed deep learning.
+# SciANN: Neural Networks for Scientific Computations 
 
 ## New to SciANN? 
 
@@ -121,17 +111,6 @@ If you are using a virtualenv, you may want to avoid using sudo:
 
 ```sh
 pip install sciann
-```
-
-Note: To install tensorflow/sicann on M1 Apple systems, do the following:
-```sh
-conda install -c apple tensorflow-deps=2.9.0
-pip install tensorflow-macos=2.9.0
-conda install matpltlib pandas    #(ETC)
-```
-and then 
-```sh
-pip install sciann-macos
 ```
 
 - **Alternatively: install SciANN from the GitHub source:**
