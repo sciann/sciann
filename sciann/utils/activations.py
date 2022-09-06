@@ -1,7 +1,7 @@
 
 from tensorflow import math as tf_math
-from tensorflow.python import keras as k
 from tensorflow.python.util.tf_export import keras_export
+import keras as k
 from keras import constraints
 from keras import initializers
 from keras import regularizers
@@ -97,7 +97,6 @@ class SciActivationLayer(k.layers.Layer):
             for i in range(1, len(input_shape)):
                 if i not in self.shared_axes:
                     axes[i] = input_shape[i]
-        self.input_spec = InputSpec(ndim=len(input_shape), axes=axes)
         self.built = True
 
     def call(self, inputs):
