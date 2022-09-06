@@ -31,7 +31,7 @@ xf = Functional('xf', x)
 xf.set_trainable(False)
 
 # Each network is defined by Functional.
-y = Functional('y', x, [10, 10, 10], activation=['tanh'])
+y = Functional('y', x, [10, 10, 10], activation=['tanh', 'g-cos', 'l-sin'])
 dy_dx = sn.diff(y, x)
 
 d = Parameter(2.0, inputs=x)
