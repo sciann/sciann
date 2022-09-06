@@ -250,6 +250,7 @@ class SciModel(object):
               save_weights=None,
               default_zero_weight=0.0,
               validation_data=None,
+              weights_val=None,
               **kwargs):
         """Performs the training on the model.
 
@@ -321,6 +322,8 @@ class SciModel(object):
             save_weights_freq: (Integer) Save weights every N epcohs.
                 Defaulted to 0.
             default_zero_weight: a small number for zero sample-weight.
+            weights_val: (List) Weights for the validation loss.
+                Defaulted to None
 
         # Returns
             A Keras 'History' object after performing fitting.
@@ -391,6 +394,83 @@ class SciModel(object):
                 x_true, y_star, sample_weights, 
                 batch_size, shuffle
             )
+# =============================================================================
+# Prepare Validation Data similar to Training Data
+# =============================================================================
+
+        if validation_data is None:
+            data_generator_validation = None
+        else:
+            if isinstance(validation_data[0], Sequence):
+                if validation_data[1] is not None:
+                    raise ValueError(
+                        'If data_generator is provided, you should not provide validation_data[1].'
+                    )
+                data_generator = validation_data[0]
+    
+            else:
+                if validation_data[1] is None:
+                    raise ValueError('(validation_data[0], validation_data[1]): Please provide proper values for both inputs and targets of SciModel. ')
+                # prepare X,Y data.
+                x_true_val = to_list(validation_data[0])
+                # for i, (x, xt) in enumerate(zip(validation_data[0], self._model.inputs)):
+                #     x_shape = tuple(xt.get_shape().as_list())
+                #     if x.shape != x_shape:
+                #         try:
+                #             validation_data[0][i] = x.reshape((-1,) + x_shape[1:])
+                #         except:
+                #             print(
+                #                 'Could not automatically convert the inputs to be ' 
+                #                 'of the same size as the expected input tensors. ' 
+                #                 'Please provide inputs of the same dimension as the `Variables`. '
+                #             )
+                #             assert False
+    
+                y_true_val = to_list(validation_data[1])
+                assert len(y_true_val)==len(self._constraints), \
+                    'Miss-match between expected targets (constraints) defined in `SciModel` and ' \
+                    'the provided `y_true_val`s - expecting the same number of data points. '
+    
+                num_sample = x_true_val[0].shape[0]
+                assert all([x.shape[0]==num_sample for x in x_true_val[1:]]), \
+                    'Inconsistent sample size among `Xs`. '
+                ids_all = np.arange(0, num_sample)
+    
+                if weights_val is None:
+                    weights_val = np.ones(num_sample)
+                elif isinstance(weights_val, np.ndarray):
+                    if len(weights_val.shape)!=1 or \
+                            weights_val.shape[0] != num_sample:
+                        try:
+                            weights_val = weights_val.reshape(num_sample)
+                        except:
+                            raise ValueError(
+                                'Input error: `weights_val` should have dimension 1 with '
+                                'the same sample length as `Xs. '
+                            )
+    
+                sample_weights_val, y_star_val = [], []
+                for i, yt in enumerate(y_true_val):
+                    c = self._constraints[i]
+                    # verify entry.
+                    ys, wei = SciModel._prepare_data(
+                        c.cond.outputs, to_list(yt),
+                        weights_val if isinstance(weights_val, np.ndarray) else weights_val[i],
+                        num_sample, default_zero_weight
+                    )
+                    # add to the list.
+                    y_star_val += ys
+                    sample_weights_val += wei
+    
+                # create Sequence wrapper for validation
+                data_generator_validation = GeneratorWrapper(
+                    x_true_val, y_star_val, sample_weights_val, 
+                    batch_size, shuffle
+                )
+
+# =============================================================================
+# 
+# =============================================================================
 
         # initialize callbacks.
         sci_callbacks = []
@@ -565,7 +645,8 @@ class SciModel(object):
             data_generator,  # sums to number of samples.
             epochs=epochs,
             callbacks=to_list(sci_callbacks) + to_list(callbacks),
-            validation_data=validation_data,
+            # validation_data=validation_data,
+            validation_data=data_generator_validation,
             **kwargs
         )
 
