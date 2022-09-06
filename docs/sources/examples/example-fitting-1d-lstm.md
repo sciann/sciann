@@ -1,19 +1,3 @@
-
-# Curve fitting in 1D
-
-Here, a 1D curve fitting example is explored. Imagine, a synthetic data
-generated from \\( \sin(x) \\) over the range of \\( [0, 2\pi] \\).
-
-To train a neural network model on this curve, you should first define a `Variable`.
-
-A neural network with three layers, each containing 10 neurons, and with `tanh` activation function is then generated
-using the `Functional` class.
-
-The target is imposed on the output using the `Data` class from `Constraint`, and passed to the `SciModel` to form a
-Sciann model.
-
-
-```python
 # Curve fitting in 1D
 
 Here, a 1D curve fitting example is explored. Imagine, a synthetic data
@@ -26,7 +10,9 @@ using the `Functional` class.
 
 The target is imposed on the output using the `Data` class from `Constraint`, and passed to the `SciModel` to form a
 Sciann model.
-'''
+
+
+```python 
 
 import numpy as np
 # from sciann.functionals.rnn_variable import RNNVariable
