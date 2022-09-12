@@ -5,7 +5,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from tensorflow.python import keras as k
+import keras as k
 
 from keras import backend as K
 graph_unique_name = K.get_graph().unique_name
@@ -146,7 +146,7 @@ class ParameterBase(k.layers.Layer):
             for i in range(1, len(input_shape)):
                 if i not in self.shared_axes:
                     axes[i] = input_shape[i]
-        self.input_spec = InputSpec(ndim=len(input_shape), axes=axes)
+        # self.input_spec = InputSpec(ndim=len(input_shape), axes=axes)
         self.built = True
 
     def call(self, inputs):
