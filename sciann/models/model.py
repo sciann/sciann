@@ -464,7 +464,7 @@ class SciModel(object):
                     model_file_path = save_weights_path + "-best.hdf5"
                     model_check_point = k.callbacks.ModelCheckpoint(
                         model_file_path, monitor='loss', save_weights_only=True, mode='auto',
-                        period=10 if 'freq' in save_weights.keys() else save_weights['freq'],
+                        period=save_weights['freq'] if 'freq' in save_weights.keys() else 10,
                         save_best_only=True
                     )
                 else:
@@ -472,7 +472,7 @@ class SciModel(object):
                     model_file_path = save_weights_path + "-{epoch:05d}-{loss:.3e}.hdf5"
                     model_check_point = k.callbacks.ModelCheckpoint(
                         model_file_path, monitor='loss', save_weights_only=True, mode='auto',
-                        period=10 if 'freq' in save_weights.keys() else save_weights['freq'],
+                        period=save_weights['freq'] if 'freq' in save_weights.keys() else 10,
                         save_best_only=False
                     )
             except:
