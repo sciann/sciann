@@ -57,6 +57,9 @@ from .mlp_functional import MLPFunctional
     trainable: Boolean.
         False if network is not trainable, True otherwise.
         Default value is True.
+    init_seed: int.
+        To make weights initialization reproducible.
+        Default value is True.
 
 # Raises
     ValueError:
@@ -74,6 +77,7 @@ def Functional(
         kernel_regularizer=None,
         bias_regularizer=None,
         trainable=True,
+        init_seed=None,
         **kwargs):
     # prepare hidden layers.
     if hidden_layers is None:
@@ -85,7 +89,8 @@ def Functional(
     # prepare kernel initializers.
     activations, def_biasinit, def_kerinit = \
         prepare_default_activations_and_initializers(
-        len(hidden_layers) * [activation] + [output_activation]
+        len(hidden_layers) * [activation] + [output_activation],
+        seed=init_seed
     )
     if kernel_initializer is None:
         kernel_initializer = def_kerinit

@@ -6,6 +6,7 @@ from __future__ import division
 from __future__ import print_function
 
 import os
+import random
 import numpy as np
 from numpy import pi
 
@@ -49,6 +50,7 @@ def set_random_seed(val=1234):
         val: A seed value..
 
     """
+    random.seed(val)
     np.random.seed(val)
     if _is_tf_1():
         tf.set_random_seed(val)
