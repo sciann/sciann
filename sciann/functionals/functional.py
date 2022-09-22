@@ -43,6 +43,8 @@ from .mlp_functional import MLPFunctional
         e.g. [10, 100, 20] is a for hidden layers with 10, 100, 20, respectively.
     activation: defaulted to "tanh".
         Activation function for the hidden layers.
+        Also can be a list of activations to supply different activations for each hidden layer.
+        If list then length should be equal to hidden_layers.
         Last layer will have a linear output.
     output_activation: defaulted to "linear".
         Activation function to be applied to the network output.
@@ -57,6 +59,9 @@ from .mlp_functional import MLPFunctional
     trainable: Boolean.
         False if network is not trainable, True otherwise.
         Default value is True.
+    rowdy_net: Boolean.
+        Only applicable when list of activations is passed in the activation parameter.
+        Default value is False.
 
 # Raises
     ValueError:
@@ -74,6 +79,7 @@ def Functional(
         kernel_regularizer=None,
         bias_regularizer=None,
         trainable=True,
+        rowdy_net=False,
         **kwargs):
     # prepare hidden layers.
     if hidden_layers is None:
@@ -83,31 +89,42 @@ def Functional(
     if not all([isinstance(n, int) for n in hidden_layers]):
         raise TypeError("Enter a list of integers as the third input assigning layer widths, e.g. [10,10,10]. ")
     # prepare kernel initializers.
+    if isinstance(activation,str):
+        acts = len(hidden_layers) * [activation] + [output_activation]
+    elif isinstance(activation,list):
+        if rowdy_net:
+            acts = len(hidden_layers) * [activation] + [output_activation]
+        else:
+            if not (len(activation) == len(hidden_layers)):
+                raise TypeError("If activation is list then list length should be equal to hidden layer list, or if you want the network to rowdy net -> pass rowdy_net=True")
+            else:
+                acts = activation + [output_activation]
+
     activations, def_biasinit, def_kerinit = \
         prepare_default_activations_and_initializers(
-        len(hidden_layers) * [activation] + [output_activation]
+        acts
     )
     if kernel_initializer is None:
         kernel_initializer = def_kerinit
     elif isinstance(kernel_initializer, (float, int)):
         kernel_initializer = default_weight_initializer(
-            len(hidden_layers) * [activation] + [output_activation],
+            acts,
             'constant',
             scale=kernel_initializer
         )
     else:
-        kernel_initializer = [kernel_initializer for l in len(hidden_layers) * [activation] + [output_activation]]
+        kernel_initializer = [kernel_initializer for l in acts]
     # prepare bias initializers.
     if bias_initializer is None:
         bias_initializer = def_biasinit
     elif isinstance(bias_initializer, (float, int)):
         bias_initializer = default_weight_initializer(
-            len(hidden_layers) * [activation] + [output_activation],
+            acts,
             'constant',
             scale=bias_initializer
         )
     else:
-        bias_initializer = [bias_initializer for l in len(hidden_layers) * [activation] + [output_activation]]
+        bias_initializer = [bias_initializer for l in acts]
     # prepare regularizers.
     kernel_regularizer = default_regularizer(kernel_regularizer)
     bias_regularizer = default_regularizer(bias_regularizer)
