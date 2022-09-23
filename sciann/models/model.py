@@ -539,12 +539,11 @@ class SciModel(object):
             else:
                 save_weights_path = save_weights['path']
             try:
-                if 'best' in save_weights.keys() and \
-                        save_weights['best'] is True:
+                if save_weights.get('best', False) == True:
                     model_file_path = save_weights_path + "-best.hdf5"
                     model_check_point = k.callbacks.ModelCheckpoint(
                         model_file_path, monitor='loss', save_weights_only=True, mode='auto',
-                        period=10 if 'freq' in save_weights.keys() else save_weights['freq'],
+                        period=save_weights.get('freq', 10),
                         save_best_only=True
                     )
                 else:
@@ -552,11 +551,12 @@ class SciModel(object):
                     model_file_path = save_weights_path + "-{epoch:05d}-{loss:.3e}.hdf5"
                     model_check_point = k.callbacks.ModelCheckpoint(
                         model_file_path, monitor='loss', save_weights_only=True, mode='auto',
-                        period=10 if 'freq' in save_weights.keys() else save_weights['freq'],
+                        period=save_weights.get('freq', 10),
                         save_best_only=False
                     )
             except:
                 print("\nWARNING: Failed to save model.weights to the provided path: {}\n".format(save_weights_path))
+
         if model_file_path is not None:
             sci_callbacks.append(model_check_point)
 
