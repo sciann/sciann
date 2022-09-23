@@ -55,7 +55,8 @@ model.train(x_true,
                            "decay_epochs": 10,
                            "verify": False},
             batch_size=32,
-            adaptive_weights={'method': "SA", "eta": 0.01}
+            adaptive_weights={'method': "SA", "eta": 0.01},
+            save_weights={'freq': 2}
             )
 
 print(f"Training finished in {time.time()-start_time}s. ")
