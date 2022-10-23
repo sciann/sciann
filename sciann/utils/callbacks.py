@@ -622,10 +622,15 @@ class SelfAdaptiveSampleWeight(Callback):
 
     def __init__(self, model, data_generator,
                  eta=0.001, freq=1, log_freq=None,
-                 loss="MSE",
+                 loss="MSE", d_mask_func=None,
                  min_max=None, **kwargs):
         super(SelfAdaptiveSampleWeight, self).__init__()
         append_to_bib(["mcclenny2020self"])
+        # by default, a linear mask function is used. 
+        if d_mask_func is None:
+            self.d_mask_func = lambda x: 1
+        else:
+            self.d_mask_func = d_mask_func
         # generate samples.
         self.data_generator = data_generator
         if loss.lower() in ("mse", "meansquarederror", "mean_squared_error"):
@@ -681,7 +686,8 @@ class SelfAdaptiveSampleWeight(Callback):
     def update_loss_weights(self, epoch, updated_losses):
         sa_weights = []
         for w0, li in zip(self.data_generator._sample_weights, updated_losses):
-            w1 = w0 + self.eta*li
+            dmw = self.d_mask_func(w0)
+            w1 = w0 + self.eta*dmw*li
             sa_weights.append(w1)
         # check for limiting weights.
         for i, wi in enumerate(sa_weights):

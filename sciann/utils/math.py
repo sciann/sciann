@@ -27,7 +27,7 @@ from .utilities import *
 from .validations import *
 
 
-def fourier(f, w=10):
+def fourier(f, w=10, trainable=False):
     """Apply Fourier transform to the `Variable` objects..
 
     # Arguments
@@ -52,7 +52,7 @@ def fourier(f, w=10):
             Dense(
                 w.size,
                 use_bias=False,
-                trainable=False,
+                trainable=trainable,
                 activation=tf_sin,
                 name=graph_unique_name("fourier-sin")
             )
@@ -65,7 +65,7 @@ def fourier(f, w=10):
             Dense(
                 w.size,
                 use_bias=False,
-                trainable=False,
+                trainable=trainable,
                 activation=tf_cos,
                 name=graph_unique_name("fourier-cos")
             )
