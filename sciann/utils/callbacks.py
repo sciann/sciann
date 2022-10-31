@@ -772,6 +772,7 @@ class CurriculumLossWeight(Callback):
         self.learning_rate = [(wf-wi)/curriculum_epochs for wi, wf in zip (initial_weights, final_weights)]
         self.delay_epochs = delay_epochs
         self.curriculum_epochs = curriculum_epochs
+        self.initialize_weights()
 
     def on_epoch_begin(self, epoch, logs={}):
         if epoch % self.freq == 0 and epoch >= self.delay_epochs:
@@ -799,6 +800,14 @@ class CurriculumLossWeight(Callback):
             self.loss_weights.append(wi)
         # print updates
         print('\n+ adaptive_weights at epoch {}:'.format(epoch + 1), self.loss_weights)
+    
+    def initialize_weights(self):
+        self.loss_weights = []
+        for i, wi in enumerate(self.initial_weights):
+            K.set_value(self.model.loss_weights[i], wi)
+            self.loss_weights.append(wi)
+        # print updates
+        print('\n+ adaptive_weights is set to: ', self.loss_weights)
 
     @staticmethod
     def prepare_inputs(*args, **kwargs):
