@@ -55,7 +55,8 @@ model.train(x_true,
                            "decay_epochs": 10,
                            "verify": False},
             batch_size=32,
-            adaptive_weights={'method': "SASW", "eta": 0.1, "d_mask_func": lambda x: np.exp(x)},
+            # adaptive_weights={'method': "SASW", "eta": 0.1, "d_mask_func": lambda x: np.exp(x)},
+            adaptive_weights={'method': "CLW", 'initial_weights': [0.1, 1.], 'final_weights': [2., 3.], 'curriculum_epochs': 20},
             save_weights={'path': 'test', 'freq': 100}
             )
 
