@@ -754,11 +754,13 @@ class CurriculumLossWeight(Callback):
                  freq=1, log_freq=None,
                  initial_weights=None,
                  final_weights=None,
-                 curriculum_epochs=None,
+                 curriculum_epochs=100,
+                 delay_epochs=0,
                  **kwargs):
         super(CurriculumLossWeight, self).__init__()
         assert len(initial_weights) == len(model.outputs), "list of initial/final weights should be provided."
         assert len(final_weights) == len(model.outputs), "list of initial/final weights should be provided."
+        assert curriculum_epochs > 0, "expecting a positive (>0) integer value for curriculum_epochs"
         self.model = model
         self.freq = np.Inf if (freq == False or freq == 0) else freq
         if log_freq is None:
@@ -768,9 +770,11 @@ class CurriculumLossWeight(Callback):
         self.initial_weights = initial_weights
         self.final_weights = final_weights
         self.learning_rate = [(wf-wi)/curriculum_epochs for wi, wf in zip (initial_weights, final_weights)]
+        self.delay_epochs = delay_epochs
+        self.curriculum_epochs = curriculum_epochs
 
     def on_epoch_begin(self, epoch, logs={}):
-        if epoch % self.freq == 0:
+        if epoch % self.freq == 0 and epoch >= self.delay_epochs:
             self.update(epoch)
 
     def update(self, epoch):
@@ -786,7 +790,7 @@ class CurriculumLossWeight(Callback):
         for i in range(len(self.model.loss_weights)):
             wi = self.initial_weights[i]
             lr = self.learning_rate[i]
-            wf = min(wi + lr*epoch, self.final_weights[i])
+            wf = min(wi + lr*(epoch - self.delay_epochs), self.final_weights[i])
             new_weights.append(wf)
         # evaluate new weights
         self.loss_weights = []
