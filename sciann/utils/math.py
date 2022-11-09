@@ -602,6 +602,18 @@ def atan(x):
     return _apply_function(x, 'atan')
 
 
+def atan2(x):
+    """Computes atan2 of x element-wise.
+
+    # Arguments
+        x: Functional object.
+
+    # Returns
+        A new functional object.
+    """
+    return _apply_function(x, 'atan2')
+
+
 def cot(x):
     """Computes cot of x element-wise.
 
