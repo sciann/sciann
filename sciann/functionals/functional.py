@@ -83,10 +83,18 @@ def Functional(
     if not all([isinstance(n, int) for n in hidden_layers]):
         raise TypeError("Enter a list of integers as the third input assigning layer widths, e.g. [10,10,10]. ")
     # prepare kernel initializers.
-    activations, def_biasinit, def_kerinit = \
-        prepare_default_activations_and_initializers(
-        len(hidden_layers) * [activation] + [output_activation]
-    )
+    if isinstance(activation, list) and isinstance(activation[0], list):
+        assert len(activation) == len(hidden_layers), \
+            'to specify activation per layer, make sure len(activation)==len(hidden_layer).'
+        activations, def_biasinit, def_kerinit = \
+            prepare_default_activations_and_initializers(
+            activation + [output_activation]
+        )
+    else:
+        activations, def_biasinit, def_kerinit = \
+            prepare_default_activations_and_initializers(
+            len(hidden_layers) * [activation] + [output_activation]
+        )
     if kernel_initializer is None:
         kernel_initializer = def_kerinit
     elif isinstance(kernel_initializer, (float, int)):
