@@ -622,10 +622,15 @@ class SelfAdaptiveSampleWeight(Callback):
 
     def __init__(self, model, data_generator,
                  eta=0.001, freq=1, log_freq=None,
-                 loss="MSE",
+                 loss="MSE", d_mask_func=None,
                  min_max=None, **kwargs):
         super(SelfAdaptiveSampleWeight, self).__init__()
         append_to_bib(["mcclenny2020self"])
+        # by default, a linear mask function is used. 
+        if d_mask_func is None:
+            self.d_mask_func = lambda x: 1
+        else:
+            self.d_mask_func = d_mask_func
         # generate samples.
         self.data_generator = data_generator
         if loss.lower() in ("mse", "meansquarederror", "mean_squared_error"):
@@ -681,7 +686,8 @@ class SelfAdaptiveSampleWeight(Callback):
     def update_loss_weights(self, epoch, updated_losses):
         sa_weights = []
         for w0, li in zip(self.data_generator._sample_weights, updated_losses):
-            w1 = w0 + self.eta*li
+            dmw = self.d_mask_func(w0)
+            w1 = w0 + self.eta*dmw*li
             sa_weights.append(w1)
         # check for limiting weights.
         for i, wi in enumerate(sa_weights):
@@ -732,6 +738,80 @@ class SelfAdaptiveLossWeight2(Callback):
     @staticmethod
     def prepare_inputs(*args, **kwargs):
         kwargs['method'] = 'SA'
+        if len(args) == 1:
+            kwargs['freq'] = args[0]
+        elif len(args) > 0:
+            raise ValueError
+        return kwargs
+
+
+@keras_export('keras.callbacks.CurriculumLossWeight')
+class CurriculumLossWeight(Callback):
+    """ Callback that evaluate the adaptive weights based on the Gradient Pathologies approach by Wang et al.
+    """
+
+    def __init__(self, model, data_generator,
+                 freq=1, log_freq=None,
+                 initial_weights=None,
+                 final_weights=None,
+                 curriculum_epochs=100,
+                 delay_epochs=0,
+                 **kwargs):
+        super(CurriculumLossWeight, self).__init__()
+        assert len(initial_weights) == len(model.outputs), "list of initial/final weights should be provided."
+        assert len(final_weights) == len(model.outputs), "list of initial/final weights should be provided."
+        assert curriculum_epochs > 0, "expecting a positive (>0) integer value for curriculum_epochs"
+        self.model = model
+        self.freq = np.Inf if (freq == False or freq == 0) else freq
+        if log_freq is None:
+            self.log_freq = self.freq
+        else:
+            self.log_freq = log_freq
+        self.initial_weights = initial_weights
+        self.final_weights = final_weights
+        self.learning_rate = [(wf-wi)/curriculum_epochs for wi, wf in zip (initial_weights, final_weights)]
+        self.delay_epochs = delay_epochs
+        self.curriculum_epochs = curriculum_epochs
+        self.initialize_weights()
+
+    def on_epoch_begin(self, epoch, logs={}):
+        if epoch % self.freq == 0 and epoch >= self.delay_epochs:
+            self.update(epoch)
+
+    def update(self, epoch):
+        self.update_loss_weights(epoch)
+
+    def on_epoch_end(self, epoch, logs={}):
+        # log gradient values
+        for i, wi in enumerate(self.loss_weights):
+            logs[f'loss_weight_{i}'] = wi
+
+    def update_loss_weights(self, epoch):
+        new_weights = []
+        for i in range(len(self.model.loss_weights)):
+            wi = self.initial_weights[i]
+            lr = self.learning_rate[i]
+            wf = min(wi + lr*(epoch - self.delay_epochs), self.final_weights[i])
+            new_weights.append(wf)
+        # evaluate new weights
+        self.loss_weights = []
+        for i, wi in enumerate(new_weights):
+            K.set_value(self.model.loss_weights[i], wi)
+            self.loss_weights.append(wi)
+        # print updates
+        print('\n+ adaptive_weights at epoch {}:'.format(epoch + 1), self.loss_weights)
+    
+    def initialize_weights(self):
+        self.loss_weights = []
+        for i, wi in enumerate(self.initial_weights):
+            K.set_value(self.model.loss_weights[i], wi)
+            self.loss_weights.append(wi)
+        # print updates
+        print('\n+ adaptive_weights is set to: ', self.loss_weights)
+
+    @staticmethod
+    def prepare_inputs(*args, **kwargs):
+        kwargs['method'] = 'CLW'
         if len(args) == 1:
             kwargs['freq'] = args[0]
         elif len(args) > 0:
@@ -1779,6 +1859,13 @@ def setup_adaptive_weight_callback(adaptive_weights, model, constraints, data_ge
     
     elif adaptive_weights["method"].lower() in ("sa", "selfadaptive", "self_adaptive"):
         return SelfAdaptiveLossWeight(
+            model, data_generator=data_generator,
+            types=[type(v).__name__ for v in constraints],
+            **adaptive_weights
+        )
+
+    elif adaptive_weights["method"].lower() in ("clw", "curriculum", "curriculum_loss_weight"):
+        return CurriculumLossWeight(
             model, data_generator=data_generator,
             types=[type(v).__name__ for v in constraints],
             **adaptive_weights
