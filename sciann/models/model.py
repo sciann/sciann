@@ -317,9 +317,6 @@ class SciModel(object):
                 . path: defaulted to the current path.
                 . freq: freq of calling CheckPoint callback.
                 . best: If True, only saves the best loss, otherwise save all weights at every `freq` epochs.
-            save_weights_to: (file_path) If you want to save the state of the model (at the end of the training).
-            save_weights_freq: (Integer) Save weights every N epcohs.
-                Defaulted to 0.
             default_zero_weight: a small number for zero sample-weight.
 
         # Returns
@@ -519,11 +516,10 @@ class SciModel(object):
         # save model.
         model_file_path = None
         if save_weights is not None:
-            assert isinstance(save_weights, dict), "pass a dictionary containing `path, freq, best`. "
-            if 'path' not in save_weights.keys():
-                save_weights_path = os.path.join(os.curdir, "weights")
-            else:
-                save_weights_path = save_weights['path']
+            assert isinstance(save_weights, dict), \
+                "pass a dictionary containing `path, freq, best`. \n" \
+                "e.g. save_weights = dict(path='output/path/', freq=10, best=False)"
+            save_weights_path = save_weights.get('path', os.path.join(os.curdir, "weights"))
             try:
                 if save_weights.get('best', False) == True:
                     model_file_path = save_weights_path + "-best.hdf5"

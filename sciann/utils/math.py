@@ -27,7 +27,7 @@ from .utilities import *
 from .validations import *
 
 
-def fourier(f, w=10):
+def fourier(f, w=10, trainable=False):
     """Apply Fourier transform to the `Variable` objects..
 
     # Arguments
@@ -52,7 +52,7 @@ def fourier(f, w=10):
             Dense(
                 w.size,
                 use_bias=False,
-                trainable=False,
+                trainable=trainable,
                 activation=tf_sin,
                 name=graph_unique_name("fourier-sin")
             )
@@ -65,7 +65,7 @@ def fourier(f, w=10):
             Dense(
                 w.size,
                 use_bias=False,
-                trainable=False,
+                trainable=trainable,
                 activation=tf_cos,
                 name=graph_unique_name("fourier-cos")
             )
@@ -600,6 +600,39 @@ def atan(x):
         A new functional object.
     """
     return _apply_function(x, 'atan')
+
+
+def atan2(y, x):
+    """Computes atan2 of y, x pair, element-wise.
+
+    # Arguments
+        y: Functional object.
+        x: Functional object.
+
+    # Returns
+        A new functional object.
+    """
+    validate_functional(x)
+    validate_functional(y)
+
+    fun = get_activation('atan2')
+    lmbd, outputs = [], []
+    for i in range(len(x.outputs)):
+        lmbd.append(
+            Lambda(
+                lambda xs: fun(xs[0], xs[1]),
+                name=graph_unique_name("{}".format('atan2'))
+            )
+        )
+        outputs += [lmbd[-1]([yi, xi]) for yi, xi in zip(y.outputs, x.outputs)]
+    Functional = x.get_class()
+    inputs = y.inputs.copy() + x.inputs.copy()
+    res = Functional(
+        inputs = unique_tensors(inputs),
+        outputs = outputs,
+        layers = lmbd
+    )
+    return res
 
 
 def cot(x):
