@@ -250,7 +250,6 @@ class SciModel(object):
               save_weights=None,
               default_zero_weight=0.0,
               validation_data=None,
-              weights_val=None,
               **kwargs):
         """Performs the training on the model.
 
@@ -322,8 +321,6 @@ class SciModel(object):
             save_weights_freq: (Integer) Save weights every N epcohs.
                 Defaulted to 0.
             default_zero_weight: a small number for zero sample-weight.
-            weights_val: (List) Weights for the validation loss.
-                Defaulted to None
 
         # Returns
             A Keras 'History' object after performing fitting.
@@ -436,18 +433,7 @@ class SciModel(object):
                     'Inconsistent sample size among `Xs`. '
                 ids_all = np.arange(0, num_sample)
     
-                if weights_val is None:
-                    weights_val = np.ones(num_sample)
-                elif isinstance(weights_val, np.ndarray):
-                    if len(weights_val.shape)!=1 or \
-                            weights_val.shape[0] != num_sample:
-                        try:
-                            weights_val = weights_val.reshape(num_sample)
-                        except:
-                            raise ValueError(
-                                'Input error: `weights_val` should have dimension 1 with '
-                                'the same sample length as `Xs. '
-                            )
+                weights_val = np.ones(num_sample)
     
                 sample_weights_val, y_star_val = [], []
                 for i, yt in enumerate(y_true_val):
