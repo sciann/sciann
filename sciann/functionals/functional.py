@@ -5,11 +5,13 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import time
 from keras import backend as K
 graph_unique_name = K.get_graph().unique_name
 
 from keras.layers import Dense
 from keras.layers import Activation
+from keras.layers import Dropout
 from keras.layers import Concatenate
 from keras.layers import Lambda
 # from keras.layers import BatchNormalization
@@ -46,6 +48,9 @@ from .mlp_functional import MLPFunctional
         Last layer will have a linear output.
     output_activation: defaulted to "linear".
         Activation function to be applied to the network output.
+    dropout_rate: Float.
+        Dropout rate for the hidden layers. Active only if > 0.
+        NOTE: Do not use dropout for PINNs.
     res_net: (True, False). Constructs a resnet architecture.
         Defaulted to False.
     kernel_initializer: Initializer of the `Kernel`, from `k.initializers`.
@@ -68,6 +73,7 @@ def Functional(
         hidden_layers=None,
         activation="tanh",
         output_activation="linear",
+        dropout_rate=0.,
         res_net=False,
         kernel_initializer=None,
         bias_initializer=None,
@@ -116,6 +122,11 @@ def Functional(
         )
     else:
         bias_initializer = [bias_initializer for l in len(hidden_layers) * [activation] + [output_activation]]
+    # check dropout rate.
+    if dropout_rate > 0.0:
+        print("\n NOTE: Dropout layer does not work with PINN setup!!! \n ")
+        time.sleep(1)
+
     # prepare regularizers.
     kernel_regularizer = default_regularizer(kernel_regularizer)
     bias_regularizer = default_regularizer(bias_regularizer)
@@ -222,6 +233,11 @@ def Functional(
         if res_net is True:
             layer = Lambda(lambda xs: (1-xs[0])*xs[1] + xs[0]*xs[2], name=graph_unique_name("ResLayer"))
             net[-1] = layer([net[-1]] + res_outputs[:2])
+        # adding dropout at the end of each layer.
+        if dropout_rate > 0.0:
+            layer = Dropout(dropout_rate, name=graph_unique_name("Dropout"))
+            layers.append(layer)
+            net[-1] = layer(net[-1])
 
     # Assign to the output variable
     if len(net) == 1:
