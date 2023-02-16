@@ -92,7 +92,8 @@ class SciOrthogonalInitializer(k.initializers.Orthogonal):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-k.utils.generic_utils.get_custom_objects().update({
-    'SciKernelInitializer': SciKernelInitializer,
-    'SciOrthogonalInitializer': SciOrthogonalInitializer
-})
+# not supported tensorflow >= 2.10
+# k.utils.get_custom_objects().update({
+#     'SciKernelInitializer': SciKernelInitializer,
+#     'SciOrthogonalInitializer': SciOrthogonalInitializer
+# })

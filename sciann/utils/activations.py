@@ -204,6 +204,7 @@ def get_activation(activation):
         )
 
 
-k.utils.generic_utils.get_custom_objects().update({
-    'SciActivation': SciActivation
-})
+# not supported tensorflow >= 2.10
+# k.utils.get_custom_objects().update({
+#     'SciActivation': SciActivation
+# })
