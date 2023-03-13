@@ -769,8 +769,9 @@ class SciModel(object):
         elif method in ("rse", "reduce_sum_error"):
             return lambda y_true, y_pred: K.sum(K.sum(y_true - y_pred, axis=0, keepdims=True), axis=-1)
         elif method in ("mean_min_error"):
-            #Useful to set a maximum limit of a PINN in the domain
-            return lambda y_true, y_pred: K.mean(K.clip(y_true-y_pred,0,None), axis=-1)
+            return lambda y_true, y_pred: K.mean(K.clip(y_pred-y_true,0,None), axis=-1)
+        elif method in ("mean_squarred_min_error"):
+            return lambda y_true, y_pred: K.mean(K.square(K.clip(y_pred-y_true,0,None)), axis=-1)
         elif hasattr(k.losses, method):
             return getattr(k.losses, method)
         else:
