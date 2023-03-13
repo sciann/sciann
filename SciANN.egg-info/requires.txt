@@ -3,9 +3,8 @@ scipy
 six
 pyyaml
 h5py
-sklearn
+scikit-learn
 pybtex
-tensorflow<=2.9.5,>=2.6.0
 
 [tests]
 pytest
