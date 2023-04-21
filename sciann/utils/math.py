@@ -773,6 +773,64 @@ def step(x):
     )
     return res
 
+def step8(x):
+    """Computes step (Heaviside) of x element-wise.
+       H(x) = 0 if x<=0
+       H(x) = 1 if x>0
+
+    # Arguments
+        x: Functional object.
+
+    # Returns
+        A new functional object.
+    """
+    validate_functional(x)
+
+    lmbd = []
+    for i in range(len(x.outputs)):
+        lmbd.append(
+            Lambda(
+                lambda x: K.cast(K.greater(x, 8.0), x.dtype), 
+                name=graph_unique_name("step8")
+            )
+        )
+        
+    Functional = x.get_class()
+    res = Functional(
+        inputs = x.inputs.copy(),
+        outputs = _apply_operation(lmbd, x),
+        layers = lmbd
+    )
+    return res
+def step12(x):
+    """Computes step (Heaviside) of x element-wise.
+       H(x) = 0 if x<=0
+       H(x) = 1 if x>0
+
+    # Arguments
+        x: Functional object.
+
+    # Returns
+        A new functional object.
+    """
+    validate_functional(x)
+
+    lmbd = []
+    for i in range(len(x.outputs)):
+        lmbd.append(
+            Lambda(
+                lambda x: K.cast(K.greater(x, 12.0), x.dtype), 
+                name=graph_unique_name("step12")
+            )
+        )
+        
+    Functional = x.get_class()
+    res = Functional(
+        inputs = x.inputs.copy(),
+        outputs = _apply_operation(lmbd, x),
+        layers = lmbd
+    )
+    return res
 
 def log(x):
     """Computes log of x element-wise.
