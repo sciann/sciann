@@ -405,6 +405,12 @@ class MLPFunctional(object):
     def __le__(self, other):
         return math.less_equal(self, other)
 
+    def __and__(self, other):
+        return math.logical_and(self, other)
+
+    def __or__(self, other):
+        return math.logical_or(self, other)
+
     @classmethod
     def get_class(cls):
         return MLPFunctional

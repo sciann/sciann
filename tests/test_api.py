@@ -403,5 +403,19 @@ def test_train_adaptive_weights_neural_tangent_kernel(train_data_fx_gx, test_dat
     )
 
 
+def test_logical_and(variable_x, test_data_x):
+    y = sn.logical_and(variable_x > -1, variable_x < 1)
+    y_test = y.eval(test_data_x)
+    y_target = np.logical_and(test_data_x > -1, test_data_x < 1)
+    assert np.all(y_test == y_target)
+
+
+def test_logical_or(variable_x, test_data_x):
+    y = sn.logical_or(variable_x > -0.25, variable_x < 0.5)
+    y_test = y.eval(test_data_x)
+    y_target = np.logical_or(test_data_x > -0.25, test_data_x < 0.5)
+    assert np.all(y_test == y_target)
+
+
 if __name__ == '__main__':
     pytest.main(['--verbose'])

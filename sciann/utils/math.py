@@ -1060,6 +1060,58 @@ def less_equal(f, other):
     return res
 
 
+def logical_and(f, other):
+    """Element-wise logical-and to the `Functional` objects.
+
+    # Arguments
+        f: Functional object.
+        other: A python number or a tensor or a functional object.
+
+    # Returns
+        A Functional.
+    """
+    validate_functional(f)
+    validate_functional(other)
+    inputs = f.inputs.copy() + to_list(other.inputs)
+
+    lambda_opr = lambda x: K.cast_to_floatx(tf.logical_and(K.cast(x[0], bool), K.cast(x[1], bool)))
+    lmbd = [Lambda(lambda_opr, name=graph_unique_name("logical_and")) for X in f.outputs]
+
+    Functional = f.get_class()
+    res = Functional(
+        inputs=unique_tensors(inputs),
+        outputs=_apply_operation(lmbd, f, other),
+        layers=lmbd
+    )
+    return res
+
+
+def logical_or(f, other):
+    """Element-wise logical-or to the `Functional` objects.
+
+    # Arguments
+        f: Functional object.
+        other: A python number or a tensor or a functional object.
+
+    # Returns
+        A Functional.
+    """
+    validate_functional(f)
+    validate_functional(other)
+    inputs = f.inputs.copy() + to_list(other.inputs)
+
+    lambda_opr = lambda x: K.cast_to_floatx(tf.logical_or(K.cast(x[0], bool), K.cast(x[1], bool)))
+    lmbd = [Lambda(lambda_opr, name=graph_unique_name("logical_or")) for X in f.outputs]
+
+    Functional = f.get_class()
+    res = Functional(
+        inputs=unique_tensors(inputs),
+        outputs=_apply_operation(lmbd, f, other),
+        layers=lmbd
+    )
+    return res
+
+
 def _apply_function(x, fname, **kwargs):
     """Apply `fname` function to x element-wise.
 
