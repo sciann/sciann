@@ -37,7 +37,7 @@ Cite SciANN in your publications if it helps your research:
 }
 ```
 
-SciANN is compatible with: __Python 2.7-3.6__.
+SciANN is compatible with: __Python 3.8-3.10__.
 
 Have questions or like collaborations, email [Ehsan Haghighat](mailto:ehsanhaghighat@sciann.com).
 
