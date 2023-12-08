@@ -26,7 +26,7 @@ Fxy = Functional('Fxy', [x, y],
 from sciann.constraints import Data
 from sciann import SciModel
 
-model = SciModel(x, Data(Fxy), 
+model = SciModel([x,y], Data(Fxy), 
                  plot_to_file='output.png')
 ```
 
