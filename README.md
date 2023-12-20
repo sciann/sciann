@@ -6,6 +6,9 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/sciann/sciann/blob/master/LICENSE)
 
 
+# :warning: NOTE :warning:
+Thanks for your interest in this project. This project is no longer maintained, so please be aware of that. The last tests are based on `python==3.9` and `tensorflow==2.10`. It should be less sensitive to Python updates, but `Keras / TensorFlow` changes rapidly. So I strongly advise to use SciANN on `TensorFlow/Keras == 2.10`.
+
 # SciANN: Neural Networks for Scientific Computations  
 
 SciANN is a Keras wrapper for scientific computations and physics-informed deep learning.
