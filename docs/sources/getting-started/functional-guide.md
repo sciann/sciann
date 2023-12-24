@@ -23,14 +23,14 @@ y = Functional(
     "y", 
     [x, x**2, x**3, sin(x), cos(x), sinh(x)],
     hidden_layers = [5, 10, 20, 10, 5],
-    activations = 'tanh',
+    activation = 'tanh',
 )
 
 # Define the SciModel. 
 model = SciModel(x, Data(y))
 
 # Solve the neural network model.
-model.solve(x_true, y_true, epochs=32, batches=10)
+model.train(x_true, y_true, epochs=32, batch_size=1000)
 
 # Find model's prediciton. 
 y_pred = model.predict(x_true)
